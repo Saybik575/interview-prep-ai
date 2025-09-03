@@ -1,4 +1,8 @@
 const express = require('express');
+const multer = require('multer');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const admin = require('firebase-admin');
@@ -7,6 +11,7 @@ const admin = require('firebase-admin');
 dotenv.config();
 
 const app = express();
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -65,6 +70,25 @@ try {
 }
 
 // Routes
+// Resume Analysis Proxy Route
+app.post('/api/resume', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  try {
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+    const response = await axios.post('http://localhost:8000/analyze-resume', form, {
+      headers: form.getHeaders(),
+    });
+    fs.unlinkSync(req.file.path);
+    res.json(response.data);
+  } catch (err) {
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.get('/', (req, res) => {
   res.json({ 
     message: 'AI Interview Preparation API',

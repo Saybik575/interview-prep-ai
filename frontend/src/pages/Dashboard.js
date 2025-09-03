@@ -89,8 +89,29 @@ const Dashboard = () => {
     return colorMap[color] || colorMap.blue;
   };
 
+  // Resume Analysis State
+  const [resumeFile, setResumeFile] = useState(null);
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setResumeFile(file);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/resume', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      alert(`Skills found: ${data.skills_found.join(', ')}\nScore: ${data.score}\nPreview: ${data.text_preview.substring(0, 100)}...`);
+    } catch (err) {
+      alert('Resume analysis failed: ' + err.message);
+    }
+  };
+
   const handleFeatureClick = (featureId) => {
-    console.log(`Feature clicked: ${featureId}`);
+    if (featureId === 'resume-analysis') return;
     alert(`${features.find(f => f.id === featureId)?.title} feature coming soon!`);
   };
 
@@ -165,12 +186,30 @@ const Dashboard = () => {
                   <p className="text-gray-600 mb-4 leading-relaxed">
                     {feature.description}
                   </p>
-                  <button
-                    onClick={() => handleFeatureClick(feature.id)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700 transition duration-300"
-                  >
-                    {feature.action}
-                  </button>
+                  {feature.id === 'resume-analysis' ? (
+                    <div>
+                      <input
+                        type="file"
+                        accept=".pdf,.docx"
+                        onChange={handleResumeUpload}
+                        className="mb-2 block"
+                      />
+                      <button
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700 transition duration-300"
+                        disabled
+                      >
+                        {feature.action}
+                      </button>
+                      <span className="text-xs text-gray-500 ml-2">Upload PDF/DOCX to analyze</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleFeatureClick(feature.id)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700 transition duration-300"
+                    >
+                      {feature.action}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
