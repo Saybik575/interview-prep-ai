@@ -70,6 +70,28 @@ try {
 }
 
 // Routes
+// Proxy for deleting resume history (moved to correct place)
+app.post('/api/resume/history/delete', async (req, res) => {
+  try {
+    const { userId, docId } = req.body;
+    const response = await axios.post('http://localhost:8000/resume/history/delete', { userId, docId });
+    res.status(response.status).json(response.data);
+  } catch (err) {
+    console.error('Error deleting history:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to delete history entry.' });
+  }
+});
+// Resume Analysis History Proxy Route
+app.get('/api/resume/history', async (req, res) => {
+  try {
+    const userId = req.query.userId || 'demoUser';
+    const response = await axios.get(`http://localhost:8000/resume/history?userId=${encodeURIComponent(userId)}`);
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Resume Analysis Proxy Route
 app.post('/api/resume', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -79,6 +101,12 @@ app.post('/api/resume', upload.single('file'), async (req, res) => {
     const FormData = require('form-data');
     const form = new FormData();
     form.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+    if (req.body.job_description) {
+      form.append('job_description', req.body.job_description);
+    }
+    if (req.body.userId) {
+      form.append('userId', req.body.userId);
+    }
     const response = await axios.post('http://localhost:8000/analyze-resume', form, {
       headers: form.getHeaders(),
     });
@@ -89,6 +117,7 @@ app.post('/api/resume', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 app.get('/', (req, res) => {
   res.json({ 
     message: 'AI Interview Preparation API',

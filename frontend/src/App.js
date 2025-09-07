@@ -1,10 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ResumeAnalysisPage from './pages/ResumeAnalysisPage';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const PrivateRoute = ({ children }) => {
   const [user, loading] = useAuthState(auth);
@@ -33,6 +35,7 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route path="/resume-analysis" element={<ResumeAnalysisPage />} />
         </Routes>
       </div>
     </Router>
