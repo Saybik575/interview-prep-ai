@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Modal, Button } from "react-bootstrap";
+import {
+  Container,
+  Card,
+  Form,
+  Button,
+  Table,
+  Spinner,
+  Modal,
+} from "react-bootstrap";
 
 const ResumeAnalysisPage = () => {
   const [jdText, setJdText] = useState("");
@@ -111,126 +119,110 @@ const ResumeAnalysisPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-8">
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Back to Dashboard
-        </button>
-        <h2 className="text-2xl font-bold mb-4">Resume Analysis</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <textarea
-            className="w-full p-2 border rounded"
-            rows={4}
-            placeholder="Paste Job Description here..."
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-          />
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            ref={fileInputRef}
-            onChange={(e) => setFile(e.target.files[0])}
-            className="block"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            disabled={loading}
-          >
-            {loading ? "Analyzing..." : "Analyze Resume"}
-          </button>
-        </form>
+    <Container className="py-5">
+      <Button variant="outline-primary" className="mb-4" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+      <Card className="mb-4 shadow">
+        <Card.Body>
+          <Card.Title as="h2" className="mb-4">Resume Analysis</Card.Title>
+          <Form onSubmit={handleSubmit}>
+            <Form.Group className="mb-3" controlId="jdText">
+              <Form.Label>Job Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={4}
+                placeholder="Paste Job Description here..."
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3" controlId="resumeFile">
+              <Form.Label>Resume File (.pdf, .doc, .docx)</Form.Label>
+              <Form.Control
+                type="file"
+                accept=".pdf,.doc,.docx"
+                ref={fileInputRef}
+                onChange={(e) => setFile(e.target.files[0])}
+              />
+            </Form.Group>
+            <Button variant="success" type="submit" disabled={loading}>
+              {loading ? <Spinner animation="border" size="sm" className="me-2" /> : null}
+              {loading ? "Analyzing..." : "Analyze Resume"}
+            </Button>
+          </Form>
+        </Card.Body>
+      </Card>
 
-        {analysisResult && !analysisResult.error && (
-          <div className="mt-8 space-y-6">
-            {/* Skills */}
-            <div className="bg-gray-100 p-4 rounded shadow">
-              <h3 className="font-semibold mb-2">Skills Found:</h3>
-              <div className="flex flex-wrap gap-2">
+      {analysisResult && !analysisResult.error && (
+        <Card className="mb-4 shadow">
+          <Card.Body>
+            <Card.Title as="h3" className="mb-3">Analysis Results</Card.Title>
+            <div className="mb-3">
+              <strong>Skills Found:</strong>
+              <div className="mt-2">
                 {(analysisResult.skills_found || []).length > 0 ? (
                   analysisResult.skills_found.map((skill) => (
                     <span
                       key={skill}
-                      className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
+                      className="badge bg-primary me-2 mb-2"
                     >
                       {skill}
                     </span>
                   ))
                 ) : (
-                  <span className="text-gray-500">No skills detected</span>
+                  <span className="text-muted">No skills detected</span>
                 )}
               </div>
             </div>
-
-            {/* Scores */}
-            <div className="flex gap-4">
-              <div className="bg-gray-100 p-4 rounded shadow flex-1">
-                <h3 className="font-semibold mb-2">Score</h3>
-                <div className="text-2xl font-bold">
-                  {`${clamp(analysisResult.score ?? 0)}/100`}
-                </div>
+            <div className="d-flex gap-4 mb-3">
+              <div className="flex-fill">
+                <strong>Score:</strong>
+                <div className="fs-4 fw-bold">{`${clamp(analysisResult.score ?? 0)}/100`}</div>
               </div>
-              <div className="bg-gray-100 p-4 rounded shadow flex-1">
-                <h3 className="font-semibold mb-2">Similarity with JD</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-full bg-gray-300 rounded h-4">
+              <div className="flex-fill">
+                <strong>Similarity with JD:</strong>
+                <div className="d-flex align-items-center gap-2">
+                  <div className="w-100 bg-light rounded" style={{ height: "1rem" }}>
                     <div
-                      className="bg-green-500 h-4 rounded"
-                      style={{
-                        width: `${clamp(analysisResult.similarity_with_jd || 0)}%`,
-                      }}
+                      className="bg-success rounded"
+                      style={{ height: "1rem", width: `${clamp(analysisResult.similarity_with_jd || 0)}%` }}
                     ></div>
                   </div>
-                  <span className="ml-2 font-bold">
-                    {clamp(analysisResult.similarity_with_jd || 0)}%
-                  </span>
+                  <span className="ms-2 fw-bold">{clamp(analysisResult.similarity_with_jd || 0)}%</span>
                 </div>
               </div>
-              <div className="bg-gray-100 p-4 rounded shadow flex-1">
-                <h3 className="font-semibold mb-2">ATS Score</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-full bg-gray-300 rounded h-4">
+              <div className="flex-fill">
+                <strong>ATS Score:</strong>
+                <div className="d-flex align-items-center gap-2">
+                  <div className="w-100 bg-light rounded" style={{ height: "1rem" }}>
                     <div
-                      className="bg-yellow-500 h-4 rounded"
-                      style={{
-                        width: `${clamp(analysisResult.ats_score || 0)}%`,
-                      }}
+                      className="bg-warning rounded"
+                      style={{ height: "1rem", width: `${clamp(analysisResult.ats_score || 0)}%` }}
                     ></div>
                   </div>
-                  <span className="ml-2 font-bold">
-                    {clamp(analysisResult.ats_score || 0)}%
-                  </span>
+                  <span className="ms-2 fw-bold">{clamp(analysisResult.ats_score || 0)}%</span>
                 </div>
               </div>
             </div>
-
-
-            {/* Missing keywords */}
-            <div className="bg-gray-100 p-4 rounded shadow">
-              <h3 className="font-semibold mb-2">Missing Keywords</h3>
-              <div className="flex flex-wrap gap-2">
+            <div className="mb-3">
+              <strong>Missing Keywords:</strong>
+              <div className="mt-2">
                 {analysisResult.missing_keywords?.length ? (
                   analysisResult.missing_keywords.map((kw) => (
                     <span
                       key={kw}
-                      className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm"
+                      className="badge bg-danger me-2 mb-2"
                     >
                       {kw}
                     </span>
                   ))
                 ) : (
-                  <span className="text-green-600">No missing keywords!</span>
+                  <span className="text-success">No missing keywords!</span>
                 )}
               </div>
             </div>
-
-            {/* Suggestions */}
-            <div className="bg-gray-100 p-4 rounded shadow">
-              <h3 className="font-semibold mb-2">Suggestions to Improve Resume</h3>
-              <ul className="list-disc ml-6">
+            <div className="mb-3">
+              <strong>Suggestions to Improve Resume:</strong>
+              <ul className="ms-3">
                 {getSuggestions().length ? (
                   getSuggestions().map((s, idx) => <li key={idx}>{s}</li>)
                 ) : (
@@ -238,79 +230,75 @@ const ResumeAnalysisPage = () => {
                 )}
               </ul>
             </div>
-
-            {/* Preview */}
-            <div className="bg-gray-100 p-4 rounded shadow">
-              <button
+            <div className="mb-3">
+              <Button
+                variant="outline-secondary"
+                className="mb-2"
                 onClick={() => setPreviewOpen((v) => !v)}
-                className="mb-2 px-3 py-1 bg-gray-300 rounded"
               >
                 {previewOpen ? "Hide" : "Show"} Resume Preview
-              </button>
+              </Button>
               {previewOpen && (
-                <pre className="whitespace-pre-wrap text-sm bg-white p-2 rounded border max-h-96 overflow-auto">
+                <pre className="bg-light p-2 rounded border" style={{ maxHeight: "24rem", overflow: "auto" }}>
                   {analysisResult.text_preview}
                 </pre>
               )}
             </div>
-          </div>
-        )}
+          </Card.Body>
+        </Card>
+      )}
 
-        {analysisResult?.error && (
-          <div className="mt-6 text-red-600">{analysisResult.error}</div>
-        )}
+      {analysisResult?.error && (
+        <Card className="mb-4 shadow border-danger">
+          <Card.Body>
+            <span className="text-danger">{analysisResult.error}</span>
+          </Card.Body>
+        </Card>
+      )}
 
-        {/* History */}
-        <div className="mt-12">
-          <h3 className="text-xl font-bold mb-4">History</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white rounded shadow">
-              <thead>
-                <tr>
-                  <th className="py-2 px-4 border-b">Date</th>
-                  <th className="py-2 px-4 border-b">Score</th>
-                  <th className="py-2 px-4 border-b">Similarity</th>
-                  <th className="py-2 px-4 border-b">ATS Score</th>
-                  <th className="py-2 px-4 border-b">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.length ? (
-                  history.map((h, idx) => (
-                    <tr key={h.docId}>
-                      <td className="py-2 px-4 border-b">
-                        {new Date(h.timestamp?._seconds * 1000).toLocaleString()}
-                      </td>
-                      <td className="py-2 px-4 border-b">{clamp(h.score)}</td>
-                      <td className="py-2 px-4 border-b">
-                        {clamp(h.similarity_with_jd)}%
-                      </td>
-                      <td className="py-2 px-4 border-b">
-                        {clamp(h.ats_score)}%
-                      </td>
-                      <td className="py-2 px-4 border-b">
-                        <button
-                          onClick={() => handleDeleteClick(h)}
-                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-2 px-4">
-                      No history found.
+      <Card className="mb-4 shadow">
+        <Card.Body>
+          <Card.Title as="h3" className="mb-3">History</Card.Title>
+          <Table striped bordered responsive className="mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Score</th>
+                <th>Similarity</th>
+                <th>ATS Score</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.length ? (
+                history.map((h, idx) => (
+                  <tr key={h.docId}>
+                    <td>{new Date(h.timestamp?._seconds * 1000).toLocaleString()}</td>
+                    <td>{clamp(h.score)}</td>
+                    <td>{clamp(h.similarity_with_jd)}%</td>
+                    <td>{clamp(h.ats_score)}%</td>
+                    <td>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDeleteClick(h)}
+                      >
+                        Delete
+                      </Button>
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center">No history found.</td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </Card.Body>
+      </Card>
+
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Deletion</Modal.Title>
         </Modal.Header>
@@ -326,7 +314,7 @@ const ResumeAnalysisPage = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+    </Container>
   );
 };
 

@@ -1,78 +1,128 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { FaFileAlt, FaMicrophoneAlt, FaTshirt, FaUser } from 'react-icons/fa';
 
 const LandingPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="text-center max-w-6xl mx-auto px-6">
-        <h1 className="text-5xl font-bold text-gray-800 mb-6">
-          AI-Powered Interview Preparation
-        </h1>
-        <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-          Master your interview skills with cutting-edge AI technology. 
-          Get personalized feedback on your resume, posture, dressing sense, 
-          and practice with our intelligent mock interview system.
-        </p>
-        
-        <div className="space-y-4 sm:space-y-0 sm:space-x-4 sm:flex sm:justify-center">
-          <button
-            onClick={() => navigate('/auth')}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg"
-          >
-            Get Started
-          </button>
-          <button
-            onClick={() => navigate('/auth')}
-            className="w-full sm:w-auto bg-white hover:bg-gray-50 text-blue-600 font-semibold py-3 px-8 rounded-lg border-2 border-blue-600 transition duration-300 transform hover:scale-105 shadow-lg"
-          >
-            Learn More
-          </button>
-        </div>
-        
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Resume Analysis</h3>
-            <p className="text-gray-600">AI-powered resume review and optimization suggestions</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Posture Training</h3>
-            <p className="text-gray-600">Real-time posture correction and body language tips</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Dressing Sense</h3>
-            <p className="text-gray-600">Get professional attire recommendations and style guidance</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Mock Interviews</h3>
-            <p className="text-gray-600">Practice with AI-driven interview simulations</p>
-          </div>
-        </div>
+    <div className="min-vh-100 bg-white d-flex flex-column justify-content-center align-items-center position-relative">
+      {/* Brand Title in Top Left Corner */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 20,
+          left: 30,
+          zIndex: 10,
+          fontFamily: 'Montserrat, Poppins, sans-serif',
+          fontWeight: 700,
+          fontSize: '2.5rem',
+          color: '#222',
+          letterSpacing: '1px',
+          textShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
+      >
+        Interview Prep AI
       </div>
+
+      {/* Main Content Container */}
+  <Container style={{ marginTop: '100px', marginBottom: '35px' }}>
+        {/* Hero Section Card */}
+        <Row className="justify-content-center mb-5">
+          <Col xs={12} md={8} lg={6}>
+            <Card className="shadow-lg border-0">
+              <Card.Body className="text-center py-5">
+                <Card.Title className="mb-4 display-5 fw-bold text-dark">
+                  Ace Your Job Preparation with AI
+                </Card.Title>
+                <Card.Text className="mb-4 text-secondary fs-5">
+                  Unlock your career potential with AI-powered resume analysis, interview practice, and instant feedback. Get personalized insights and prepare to stand out in every job application.
+                </Card.Text>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="fw-bold shadow-sm px-5"
+                  onClick={() => navigate('/auth')}
+                >
+                  Get Started
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Feature Cards Grid */}
+  <Row className="g-10 justify-content-center"> {/* Increased vertical gap with g-10 */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body className="text-center py-4">
+                <Card.Title className="mb-3 d-flex flex-column align-items-center text-primary">
+                  <FaFileAlt size={32} className="mb-2" />
+                  Resume Analysis
+                </Card.Title>
+                <Card.Text className="text-secondary">
+                  AI-powered resume review and optimization suggestions.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body className="text-center py-4">
+                <Card.Title className="mb-3 d-flex flex-column align-items-center text-success">
+                  <FaMicrophoneAlt size={32} className="mb-2" />
+                  Interview Practice
+                </Card.Title>
+                <Card.Text className="text-secondary">
+                  Practice common interview questions and get instant feedback.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body className="text-center py-4">
+                <Card.Title className="mb-3 d-flex flex-column align-items-center text-danger">
+                  <FaUser size={32} className="mb-2" />
+                  Posture Training
+                </Card.Title>
+                <Card.Text className="text-secondary">
+                  Real-time posture correction and body language improvement tips.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body className="text-center py-4">
+                <Card.Title className="mb-3 d-flex flex-column align-items-center text-warning">
+                  <FaTshirt size={32} className="mb-2" />
+                  Dressing Sense
+                </Card.Title>
+                <Card.Text className="text-secondary">
+                  Get professional attire recommendations and style guidance.
+                </Card.Text>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+      
+  {/* Footer Card at the bottom */}
+      <footer className="mt-auto py-3 w-100">
+        <Container fluid>
+          <Row>
+            <Col xs={12}>
+              <Card className="shadow-sm border-0">
+                <Card.Body className="text-center py-3">
+                  <span className="text-secondary fw-semibold">© {new Date().getFullYear()} Interview Prep AI. All rights reserved.</span>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Container>
+      </footer>
     </div>
   );
 };
