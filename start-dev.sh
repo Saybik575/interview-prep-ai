@@ -23,7 +23,10 @@ fi
 if ! check_port 5000; then
     exit 1
 fi
-echo "✅ Ports 3000 and 5000 are available"
+if ! check_port 5001; then
+    exit 1
+fi
+echo "✅ Ports 3000, 5000, and 5001 are available"
 echo ""
 
 # Start backend
@@ -33,7 +36,14 @@ npm run dev &
 BACKEND_PID=$!
 cd ..
 
-# Wait a moment for backend to start
+# Start Flask resume-analysis-service
+echo "🧠 Starting Flask resume analysis service..."
+cd resume-analysis-service
+python app.py &
+FLASK_PID=$!
+cd ..
+
+# Wait a moment for backend and Flask to start
 sleep 3
 
 # Start frontend
@@ -44,12 +54,13 @@ FRONTEND_PID=$!
 cd ..
 
 echo ""
-echo "🎉 Both services are starting up!"
+echo "🎉 All services are starting up!"
 echo ""
 echo "📱 Frontend: http://localhost:3000"
 echo "🔧 Backend:  http://localhost:5000"
+echo "🧠 Resume Analysis Service (Flask): http://localhost:5001 or as configured"
 echo ""
-echo "Press Ctrl+C to stop both services"
+echo "Press Ctrl+C to stop all services"
 
 # Function to cleanup on exit
 cleanup() {
@@ -57,6 +68,7 @@ cleanup() {
     echo "🛑 Stopping services..."
     kill $BACKEND_PID 2>/dev/null
     kill $FRONTEND_PID 2>/dev/null
+    kill $FLASK_PID 2>/dev/null
     echo "✅ Services stopped"
     exit 0
 }

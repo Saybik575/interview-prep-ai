@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,6 +20,12 @@ const ResumeAnalysisPage = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  // Advanced history management states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortKey, setSortKey] = useState("timestamp");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [showLatestOnly, setShowLatestOnly] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   const fileInputRef = useRef();
   const navigate = useNavigate();
@@ -28,17 +34,20 @@ const ResumeAnalysisPage = () => {
   const userId = "demoUser";
 
   const fetchHistory = async () => {
+    setIsHistoryLoading(true);
     try {
       const response = await axios.get(`/api/resume/history?userId=${userId}`);
       setHistory(response.data);
     } catch (err) {
       console.error("Failed to fetch resume history", err);
       setHistory([]);
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchHistory();
+  fetchHistory();
   }, [userId]);
 
   const handleSubmit = async (e) => {
@@ -118,8 +127,72 @@ const ResumeAnalysisPage = () => {
     return Math.min(100, Math.max(0, Math.round(n)));
   };
 
+  // Memoized filtered and sorted history
+  const processedHistory = useMemo(() => {
+    let filtered = history;
+    // Filter by searchTerm (score, date)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter((item) => {
+        const scoreStr = String(item.score ?? "");
+        const dateStr = item.timestamp?._seconds ? new Date(item.timestamp._seconds * 1000).toLocaleString().toLowerCase() : "";
+        return scoreStr.includes(term) || dateStr.includes(term);
+      });
+    }
+    // Sort
+    filtered = [...filtered].sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+      if (sortKey === "timestamp") {
+        aVal = a.timestamp?._seconds || 0;
+        bVal = b.timestamp?._seconds || 0;
+      }
+      if (sortDirection === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+    // Latest only
+    if (showLatestOnly && filtered.length) {
+      return [filtered[0]];
+    }
+    return filtered;
+  }, [history, searchTerm, sortKey, sortDirection, showLatestOnly]);
+
+  // Export to CSV
+  const handleExport = () => {
+    if (!processedHistory.length) return;
+    const headers = ["Date", "Score", "Similarity", "ATS Score"];
+    const rows = processedHistory.map((h) => {
+      let dateStr = "";
+      if (h.timestamp?._seconds) {
+        dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
+      } else if (h.timestamp) {
+        const d = new Date(h.timestamp);
+        dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
+      }
+      return [
+        dateStr,
+        clamp(h.score),
+        clamp(h.similarity_with_jd) + "%",
+        clamp(h.ats_score) + "%",
+      ];
+    });
+    let csv = headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resume_analysis_history.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <Container className="py-5">
+  <Container className="py-5">
       <Button variant="outline-primary" className="mb-4" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
       <Card className="mb-4 shadow">
         <Card.Body>
@@ -259,6 +332,42 @@ const ResumeAnalysisPage = () => {
       <Card className="mb-4 shadow">
         <Card.Body>
           <Card.Title as="h3" className="mb-3">History</Card.Title>
+          {/* Advanced Controls */}
+          <div className="d-flex flex-wrap gap-3 mb-3 align-items-center">
+            <Form.Control
+              type="text"
+              placeholder="Search by score or date..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ maxWidth: 220 }}
+            />
+            <Form.Select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value)}
+              style={{ maxWidth: 160 }}
+            >
+              <option value="timestamp">Sort by Date</option>
+              <option value="score">Sort by Score</option>
+              <option value="ats_score">Sort by ATS Score</option>
+              <option value="similarity_with_jd">Sort by Similarity</option>
+            </Form.Select>
+            <Form.Select
+              value={sortDirection}
+              onChange={e => setSortDirection(e.target.value)}
+              style={{ maxWidth: 120 }}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </Form.Select>
+            <Form.Check
+              type="switch"
+              id="latest-only-toggle"
+              label="Show Latest Only"
+              checked={showLatestOnly}
+              onChange={e => setShowLatestOnly(e.target.checked)}
+            />
+            <Button variant="outline-secondary" onClick={handleExport}>Export</Button>
+          </div>
           <Table striped bordered responsive className="mb-0">
             <thead>
               <tr>
@@ -270,24 +379,40 @@ const ResumeAnalysisPage = () => {
               </tr>
             </thead>
             <tbody>
-              {history.length ? (
-                history.map((h, idx) => (
-                  <tr key={h.docId}>
-                    <td>{new Date(h.timestamp?._seconds * 1000).toLocaleString()}</td>
-                    <td>{clamp(h.score)}</td>
-                    <td>{clamp(h.similarity_with_jd)}%</td>
-                    <td>{clamp(h.ats_score)}%</td>
-                    <td>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeleteClick(h)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+              {isHistoryLoading ? (
+                <tr>
+                  <td colSpan={5} className="text-center">
+                    <Spinner animation="border" size="sm" className="me-2" /> Loading...
+                  </td>
+                </tr>
+              ) : processedHistory.length ? (
+                processedHistory.map((h, idx) => {
+                  let dateStr = "";
+                  if (h.timestamp?._seconds) {
+                    dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
+                  } else if (h.timestamp) {
+                    // Try parsing as string or ISO date
+                    const d = new Date(h.timestamp);
+                    dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
+                  }
+                  return (
+                    <tr key={h.docId}>
+                      <td>{dateStr}</td>
+                      <td>{clamp(h.score)}</td>
+                      <td>{clamp(h.similarity_with_jd)}%</td>
+                      <td>{clamp(h.ats_score)}%</td>
+                      <td>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteClick(h)}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={5} className="text-center">No history found.</td>
