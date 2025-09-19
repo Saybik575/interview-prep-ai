@@ -31,7 +31,7 @@ const Dashboard = () => {
               Welcome, {user.displayName || user.email}!
             </span>
           )}
-          <Button variant="outline-secondary" size="sm" onClick={async () => { await signOut(auth); navigate('/auth'); }}>Logout</Button>
+          <Button variant="outline-secondary" size="sm" onClick={async () => { await signOut(auth); navigate('/'); }}>Logout</Button>
         </div>
       </div>
 
