@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MockInterviewPage from './pages/MockInterviewPage';
 import ResumeAnalysisPage from './pages/ResumeAnalysisPage';
+import InterviewHistoryPage from './pages/InterviewHistoryPage';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase';
 import LandingPage from './pages/LandingPage';
@@ -38,6 +39,7 @@ function App() {
           />
           <Route path="/resume-analysis" element={<ResumeAnalysisPage />} />
           <Route path="/mock-interview" element={<MockInterviewPage />} />
+          <Route path="/interview-history" element={<InterviewHistoryPage />} />
         </Routes>
       </div>
     </Router>

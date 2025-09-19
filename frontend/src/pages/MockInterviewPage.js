@@ -1,12 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
-import {
-  Container,
-  Card,
-  Form,
-  Button,
-} from "react-bootstrap";
+// import { Link } from "react-router-dom"; // Removed unused import
+import { Container, Card, Form, Button, Spinner, Collapse, Modal } from "react-bootstrap";
 import MockInterviewChat from "./MockInterviewChat";
 import { auth } from "../firebase";
 
@@ -20,6 +15,17 @@ const MockInterviewPage = () => {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [expanded, setExpanded] = useState({});
+  const [deleteLoading, setDeleteLoading] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortKey, setSortKey] = useState("timestamp");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [showLatestOnly, setShowLatestOnly] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
 
   // Handle sending a user message (answer) and get evaluation feedback
   const handleSendMessage = async (userInput) => {
@@ -36,7 +42,8 @@ const MockInterviewPage = () => {
         job_position: position,
         difficulty,
         messages: newMessages,
-        userId
+        userId,
+        sessionId
       });
       if (res.data && res.data.next_question) {
         // Add feedback and score as a special assistant message
@@ -60,25 +67,141 @@ const MockInterviewPage = () => {
     }
   };
 
-  // Handle ending the interview (return to setup view)
+  // Handle ending the interview (show setup + history)
   const handleEndInterview = () => {
     setInterviewStarted(false);
     setMessages([]);
     setError("");
+    setSessionId(null);
+    fetchHistory();
   };
+
+  // Fetch interview history for logged-in user
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        setHistory([]);
+        setHistoryLoading(false);
+        return;
+      }
+      const res = await axios.get(`/api/interview/history?userId=${user.uid}`);
+      setHistory(res.data.sessions || []);
+    } catch (err) {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const handleToggle = (sessionId) => {
+    setExpanded((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }));
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    setShowDeleteModal(true);
+    setSessionToDelete(sessionId);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    setDeleteLoading(sessionToDelete);
+    try {
+      await axios.delete(`/api/interview/history/${sessionToDelete}`);
+      setHistory((prev) => prev.filter((s) => s.id !== sessionToDelete));
+      setShowDeleteModal(false);
+      setSessionToDelete(null);
+    } catch (err) {
+      alert("Failed to delete session.");
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  // Export to CSV
+  const exportToCSV = () => {
+    if (!processedHistory.length) return;
+    const rows = [
+      ["Position", "Difficulty", "Score", "Question", "Answer", "Feedback", "Improvement", "Time"]
+    ];
+    processedHistory.forEach((session) => {
+      session.questions.forEach((q, idx) => {
+        rows.push([
+          session.position,
+          session.difficulty,
+          q.score,
+          q.question.replace(/\n/g, " "),
+          q.answer.replace(/\n/g, " "),
+          q.positive_feedback.replace(/\n/g, " "),
+          q.improvement.replace(/\n/g, " "),
+          q.timestamp && (q.timestamp._seconds ? new Date(q.timestamp._seconds * 1000).toLocaleString() : q.timestamp)
+        ]);
+      });
+    });
+    const csvContent = rows.map(r => r.map(f => '"' + String(f).replace(/"/g, '""') + '"').join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "interview_history.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Filter, sort, and latest logic
+  const processedHistory = useMemo(() => {
+    let filtered = history;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter((session) => {
+        const pos = session.position?.toLowerCase() || "";
+        const diff = session.difficulty?.toLowerCase() || "";
+        const questions = session.questions.map(q => (q.question + q.answer + q.positive_feedback + q.improvement).toLowerCase()).join(" ");
+        const score = session.questions.map(q => String(q.score)).join(" ");
+        const time = session.questions.map(q => q.timestamp && (q.timestamp._seconds ? new Date(q.timestamp._seconds * 1000).toLocaleString() : q.timestamp)).join(" ");
+        return pos.includes(term) || diff.includes(term) || questions.includes(term) || score.includes(term) || time.includes(term);
+      });
+    }
+    filtered = [...filtered].sort((a, b) => {
+      let aVal = a.questions[0]?.timestamp?._seconds || 0;
+      let bVal = b.questions[0]?.timestamp?._seconds || 0;
+      if (sortKey === "score") {
+        aVal = a.questions[0]?.score || 0;
+        bVal = b.questions[0]?.score || 0;
+      }
+      if (sortDirection === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+    if (showLatestOnly && filtered.length) {
+      return [filtered[0]];
+    }
+    return filtered;
+  }, [history, searchTerm, sortKey, sortDirection, showLatestOnly]);
 
   const handleStartInterview = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
+      const user = auth.currentUser;
+      const userId = user ? user.uid : null;
       const res = await axios.post("/api/interview/start", {
         job_position: position,
-        difficulty
+        difficulty,
+        userId
       });
-      if (res.data && res.data.ai_message) {
+      if (res.data && res.data.ai_message && res.data.sessionId) {
         setMessages([{ role: "assistant", content: res.data.ai_message.content }]);
         setInterviewStarted(true);
+        setSessionId(res.data.sessionId);
       } else {
         setError("No AI question received. Please try again.");
       }
@@ -92,16 +215,19 @@ const MockInterviewPage = () => {
   return (
     <Container className="py-5">
 
-      <Button as={Link} to="/dashboard" variant="outline-primary" className="mb-4">
-        Back to Dashboard
-      </Button>
       {error && <div className="alert alert-danger">{error}</div>}
 
       {!interviewStarted ? (
         <Card className="mb-4 shadow">
           <Card.Body>
             <Card.Title as="h2" className="mb-3">
-              ▶️ Start New Interview
+              <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 16 }}>
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="orange" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
+                  <circle cx="16" cy="16" r="16" fill="#FFA500"/>
+                  <polygon points="13,10 23,16 13,22" fill="white"/>
+                </svg>
+              </span>
+              <span style={{ fontSize: '2rem', verticalAlign: 'middle' }}>Start New Interview</span>
             </Card.Title>
             <p className="text-secondary mb-4">
               Configure your mock interview session
@@ -135,7 +261,7 @@ const MockInterviewPage = () => {
                       What to Expect:
                     </h3>
                     <ul className="mb-0" style={{ color: '#174ea6', fontSize: '1rem', listStyle: 'disc inside' }}>
-                      <li>5 tailored questions based on your target position</li>
+                      <li>Tailored questions based on your target position</li>
                       <li>Real-time analysis of your responses</li>
                       <li>Compare your answers with ideal responses</li>
                       <li>Comprehensive feedback and scoring</li>
@@ -164,6 +290,149 @@ const MockInterviewPage = () => {
           loading={loading}
           onEndInterview={handleEndInterview}
         />
+      )}
+      {/* Interview History Table - only show when not in interview */}
+      {!interviewStarted && (
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title as="h3">Interview History</Card.Title>
+            <div className="d-flex flex-wrap align-items-center mb-3 gap-2">
+              <Form.Control
+                type="text"
+                placeholder="Search by position, score, or date..."
+                style={{ maxWidth: 250 }}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+              <Form.Select
+                value={sortKey}
+                onChange={e => setSortKey(e.target.value)}
+                style={{ maxWidth: 120 }}
+              >
+                <option value="timestamp">Sort by Date</option>
+                <option value="score">Sort by Score</option>
+              </Form.Select>
+              <Form.Select
+                value={sortDirection}
+                onChange={e => setSortDirection(e.target.value)}
+                style={{ maxWidth: 120 }}
+              >
+                <option value="desc">Descend</option>
+                <option value="asc">Ascend</option>
+              </Form.Select>
+              <Form.Check
+                type="checkbox"
+                label="Show Latest Only"
+                checked={showLatestOnly}
+                onChange={e => setShowLatestOnly(e.target.checked)}
+                className="ms-2"
+              />
+              <Button variant="outline-secondary" size="sm" onClick={exportToCSV}>
+                Export
+              </Button>
+            </div>
+            {historyLoading ? (
+              <Spinner animation="border" />
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-bordered align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Date</th>
+                      <th>Position</th>
+                      <th>Difficulty</th>
+                      <th>Score</th>
+                      <th>Details</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {processedHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-secondary">No interview sessions found.</td>
+                      </tr>
+                    ) : (
+                      processedHistory.map((session) => {
+                        const firstQ = session.questions[0] || {};
+                        return (
+                          <React.Fragment key={session.id}>
+                            <tr>
+                              <td>{firstQ.timestamp && (firstQ.timestamp._seconds ? new Date(firstQ.timestamp._seconds * 1000).toLocaleString() : firstQ.timestamp)}</td>
+                              <td>{session.position}</td>
+                              <td>{session.difficulty}</td>
+                              <td>{firstQ.score !== undefined ? firstQ.score + "/10" : "-"}</td>
+                              <td>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => handleToggle(session.id)}
+                                  aria-controls={`collapse-${session.id}`}
+                                  aria-expanded={expanded[session.id] || false}
+                                >
+                                  {expanded[session.id] ? "Hide Details" : "Show Details"}
+                                </Button>
+                              </td>
+                              <td>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => handleDeleteSession(session.id)}
+                                  disabled={deleteLoading === session.id}
+                                >
+                                  {deleteLoading === session.id ? <Spinner size="sm" /> : "Delete"}
+                                </Button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td colSpan={5} style={{ padding: 0, border: 0 }}>
+                                <Collapse in={expanded[session.id] || false}>
+                                  <div id={`collapse-${session.id}`} className="p-3 bg-light">
+                                    <ul className="list-group list-group-flush">
+                                      {session.questions.map((q, idx) => (
+                                        <li className="list-group-item" key={idx}>
+                                          <strong>Q{idx + 1}:</strong> {q.question}
+                                          <br />
+                                          <strong>Your Answer:</strong> {q.answer}
+                                          <br />
+                                          <strong>Score:</strong> {q.score}/10
+                                          <br />
+                                          <strong>Feedback:</strong> {q.positive_feedback}
+                                          <br />
+                                          <strong>Improvement:</strong> {q.improvement}
+                                          <br />
+                                          <strong>Time:</strong> {q.timestamp && (q.timestamp._seconds ? new Date(q.timestamp._seconds * 1000).toLocaleString() : q.timestamp)}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </Collapse>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Delete confirmation modal */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+              <Modal.Header closeButton>
+                <Modal.Title>Delete Interview Session</Modal.Title>
+              </Modal.Header>
+              <Modal.Body>Are you sure you want to delete this interview session? This cannot be undone.</Modal.Body>
+              <Modal.Footer>
+                <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                  Cancel
+                </Button>
+                <Button variant="danger" onClick={confirmDeleteSession} disabled={deleteLoading}>
+                  {deleteLoading ? <Spinner size="sm" /> : "Delete"}
+                </Button>
+              </Modal.Footer>
+            </Modal>
+          </Card.Body>
+        </Card>
       )}
     </Container>
   );

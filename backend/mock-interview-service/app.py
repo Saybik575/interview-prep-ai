@@ -26,7 +26,11 @@ def interview():
         return jsonify({"error": "Missing or invalid fields: job_position, difficulty, messages (list) required."}), 400
 
     # Construct system/context message
-    system_prompt = f"You are an AI interviewer for the position of {job_position} at {difficulty} level. Ask one question at a time, analyze answers, and provide feedback when appropriate."
+    system_prompt = (
+        f"You are an AI interviewer for the position of {job_position} at {difficulty} level. "
+        "Ask one question at a time, analyze answers, and provide feedback when appropriate. "
+        "Do not repeat questions or topics already discussed in this interview. Each new question should be unique and cover a different aspect relevant to the position and difficulty."
+    )
     ollama_messages = [
         {"role": "system", "content": system_prompt}
     ] + messages
