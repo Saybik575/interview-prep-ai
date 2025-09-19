@@ -1,9 +1,3 @@
-# Ignore service account credentials
-resume-analysis-service/*.json
-
-# Ignore environment files
-resume-analysis-service/.env
-
 # Node modules
 node_modules/
 

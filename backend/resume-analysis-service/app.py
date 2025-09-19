@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 from werkzeug.utils import secure_filename
 import docx2txt
 from pdfminer.high_level import extract_text

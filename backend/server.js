@@ -69,6 +69,15 @@ try {
   console.log('⚠️ Continuing without Firebase...');
 }
 
+// Interview proxy route
+const interviewRouter = require('./routes/interview');
+// Attach db to app and router for Firestore access in routes
+if (db) {
+  app.set('db', db);
+  interviewRouter.db = db;
+}
+app.use('/api/interview', interviewRouter);
+
 // Routes
 // Proxy for deleting resume history (moved to correct place)
 app.post('/api/resume/history/delete', async (req, res) => {

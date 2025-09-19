@@ -36,12 +36,20 @@ npm run dev &
 BACKEND_PID=$!
 cd ..
 
+
 # Start Flask resume-analysis-service
 echo "🧠 Starting Flask resume analysis service..."
-cd resume-analysis-service
+cd backend/resume-analysis-service
 python app.py &
 FLASK_PID=$!
-cd ..
+cd ../..
+
+# Start Flask mock-interview-service
+echo "🤖 Starting Flask mock interview service..."
+cd backend/mock-interview-service
+python app.py &
+MOCK_PID=$!
+cd ../..
 
 # Wait a moment for backend and Flask to start
 sleep 3
@@ -63,12 +71,14 @@ echo ""
 echo "Press Ctrl+C to stop all services"
 
 # Function to cleanup on exit
+
 cleanup() {
     echo ""
     echo "🛑 Stopping services..."
     kill $BACKEND_PID 2>/dev/null
     kill $FRONTEND_PID 2>/dev/null
     kill $FLASK_PID 2>/dev/null
+    kill $MOCK_PID 2>/dev/null
     echo "✅ Services stopped"
     exit 0
 }
