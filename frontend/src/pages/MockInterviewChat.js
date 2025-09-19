@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Card, Form, Button, Spinner } from "react-bootstrap";
+import { Link } from "react-router-dom";
 
 const MockInterviewChat = ({ position, difficulty, messages, onSend, loading, onEndInterview }) => {
   const [input, setInput] = useState("");
@@ -15,6 +16,11 @@ const MockInterviewChat = ({ position, difficulty, messages, onSend, loading, on
   return (
     <Card className="mb-4 shadow">
       <Card.Body className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: "500px" }}>
+        <div className="w-100 mb-3" style={{ maxWidth: 600, textAlign: 'left' }}>
+          <Button as={Link} to="/dashboard" variant="outline-primary" className="mb-2">
+            Back to Dashboard
+          </Button>
+        </div>
         <h2 className="fs-2 fw-bold mb-3">Mock Interview In Progress</h2>
         <p className="mb-1">
           Position: <span className="fw-semibold">{position}</span>

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { Container, Card, Form, Button, Spinner, Collapse, Modal } from "react-bootstrap";
@@ -210,6 +211,10 @@ const MockInterviewPage = () => {
 
   return (
     <Container className="py-5">
+
+      <Button as={Link} to="/dashboard" variant="outline-primary" className="mb-4">
+        Back to Dashboard
+      </Button>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
