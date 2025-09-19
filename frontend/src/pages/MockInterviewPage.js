@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-// import { Link } from "react-router-dom"; // Removed unused import
 import { Container, Card, Form, Button, Spinner, Collapse, Modal } from "react-bootstrap";
 import MockInterviewChat from "./MockInterviewChat";
 import { auth } from "../firebase";
-
-
-
 
 const MockInterviewPage = () => {
   const [position, setPosition] = useState("");
