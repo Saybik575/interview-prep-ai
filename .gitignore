@@ -3,6 +3,11 @@ node_modules/
 
 # Python virtual environment
 .venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Other common secrets
 *.env
@@ -91,3 +96,20 @@ frontend/.env.production
 # Logs (frontend + backend)
 frontend/*.log
 backend/*.log
+
+# Python service specific
+backend/resume-analysis-service/uploads/*
+backend/posture-analysis-service/uploads/*
+backend/posture-analysis-service/venv/
+backend/resume-analysis-service/venv/
+backend/mock-interview-service/venv/
+
+# YOLO models (large files)
+*.pt
+*.onnx
+*.torchscript
+
+# Service-specific environments
+backend/resume-analysis-service/.env
+backend/posture-analysis-service/.env
+backend/mock-interview-service/.env
