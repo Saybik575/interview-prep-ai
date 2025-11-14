@@ -108,7 +108,7 @@ const Dashboard = () => {
               <Card.Text>
                 Real-time posture correction and body language improvement tips.
               </Card.Text>
-              <Button variant="danger" onClick={() => alert('Feature coming soon!')}>
+              <Button variant="danger" onClick={() => navigate('/posture-analyzer')}>
                 Start Training
               </Button>
             </Card.Body>

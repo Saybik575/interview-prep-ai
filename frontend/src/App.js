@@ -1,47 +1,57 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import MockInterviewPage from './pages/MockInterviewPage';
-import ResumeAnalysisPage from './pages/ResumeAnalysisPage';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+} from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase';
-import LandingPage from './pages/LandingPage';
-import AuthPage from './pages/AuthPage';
-import Dashboard from './pages/Dashboard';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-const PrivateRoute = ({ children }) => {
+// Lazy-loaded route components (code splitting)
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const AuthPage = React.lazy(() => import('./pages/AuthPage'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const ResumeAnalysisPage = React.lazy(() => import('./pages/ResumeAnalysisPage'));
+const MockInterviewPage = React.lazy(() => import('./pages/MockInterviewPage'));
+const PostureAnalyzer = React.lazy(() => import('./pages/PostureAnalyzer'));
+
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-gray-600">Loading...</div>
+  </div>
+);
+
+const PrivateWrapper = ({ element }) => {
   const [user, loading] = useAuthState(auth);
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
-  return user ? children : <Navigate to="/auth" replace />;
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return element;
 };
 
-function App() {
+// Central route config using Data APIs with future flags (silences v7 warnings)
+export const router = createBrowserRouter(
+  [
+    { path: '/', element: <LandingPage /> },
+    { path: '/auth', element: <AuthPage /> },
+    { path: '/dashboard', element: <PrivateWrapper element={<Dashboard />} /> },
+    { path: '/resume-analysis', element: <ResumeAnalysisPage /> },
+    { path: '/mock-interview', element: <MockInterviewPage /> },
+    { path: '/posture-analyzer', element: <PostureAnalyzer /> },
+    { path: '*', element: <Navigate to="/" replace /> },
+  ],
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  }
+);
+
+export default function App() {
   return (
-    <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/resume-analysis" element={<ResumeAnalysisPage />} />
-          <Route path="/mock-interview" element={<MockInterviewPage />} />
-        </Routes>
-      </div>
-    </Router>
+    <React.Suspense fallback={<div style={{padding:'2rem', textAlign:'center'}}>Loading...</div>}>
+      <RouterProvider router={router} />
+    </React.Suspense>
   );
 }
-
-export default App;
