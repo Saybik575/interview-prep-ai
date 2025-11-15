@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -40,7 +40,7 @@ const useDressingSenseLogic = (userId) => {
   /*
   "In this React component using axios, create an async function `fetchDressingHistory`. This function should make a GET request to `/api/dress/history?userId=${userId}`. Set `isHistoryLoading` to true before the call and false in the finally block. On success, set the response data to the `history` state."
   */
-  const fetchDressingHistory = async () => {
+  const fetchDressingHistory = useCallback(async () => {
     setIsHistoryLoading(true);
     try {
       // Call backend dressing history endpoint
@@ -66,11 +66,11 @@ const useDressingSenseLogic = (userId) => {
     } finally {
       setIsHistoryLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchDressingHistory();
-  }, [userId]);
+  }, [fetchDressingHistory]);
 
   // GitHub Copilot Prompt for handleConfirmDelete (Backend simulation)
   /*
