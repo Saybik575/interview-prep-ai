@@ -105,3 +105,29 @@ npm install
 ---
 
 **🎉 You're ready to start building your AI Interview Preparation App!** 
+
+## 🛠️ Dev Orchestration Scripts
+
+Two helper scripts are included to start all local services on separate ports and run the Node backend with the correct environment variables:
+
+- `start-dev.sh` — for Git Bash / WSL / macOS / Linux
+- `start-dev.bat` — for Windows
+
+These scripts start the mock-interview, dressing-analysis, posture-analysis, resume-analysis services on distinct ports and write logs to the `dev_logs/` directory. They also set the following environment variables for the Node backend (overridable):
+
+- `MOCK_INTERVIEW_URL` (default `http://localhost:5002`)
+- `DRESS_ANALYZE_URL` (default `http://localhost:5003/api/analyze-dress`)
+- `POSTURE_SERVICE_URL` (default `http://localhost:5001`)
+
+Usage (Bash):
+```bash
+chmod +x ./start-dev.sh
+./start-dev.sh
+```
+
+Usage (Windows PowerShell / CMD):
+```powershell
+.\start-dev.bat
+```
+
+If you prefer to run services individually, set the env vars above before starting `backend/server.js` and start services manually.

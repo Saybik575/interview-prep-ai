@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import { Container, Card, Form, Button, Spinner, Collapse, Modal } from "react-bootstrap";
+import { Container, Card, Form, Button, Spinner, Collapse, Modal, Row, Col, Alert } from "react-bootstrap"; // Added Row, Col, Alert
 import MockInterviewChat from "./MockInterviewChat";
 import { auth } from "../firebase";
 
@@ -292,6 +292,32 @@ const MockInterviewPage = () => {
           onEndInterview={handleEndInterview}
         />
       )}
+
+      {/* NEW: Interview Strategy Tips Card */}
+      <Card className='mb-4 shadow'>
+        <Card.Body>
+          <Card.Title as='h3' className='mb-3'>🗣️ Interview Strategy Tips</Card.Title>
+          <Row>
+            <Col md={4} className='mb-3'>
+              <Alert variant='success' className='mb-0'>
+                <strong>Use the STAR Method:</strong> Structure behavioral answers using Situation, Task, Action, and Result.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='info' className='mb-0'>
+                <strong>Quantify Achievements:</strong> Use numbers and data to demonstrate the impact of your work (e.g., "Increased efficiency by 20%").
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='warning' className='mb-0'>
+                <strong>Prepare Questions:</strong> Always have 2-3 thoughtful questions ready for the interviewer about the role or company.
+              </Alert>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+      {/* END NEW TIPS */}
+
       {/* Interview History Table - only show when not in interview */}
       {!interviewStarted && (
         <Card className="mb-4">

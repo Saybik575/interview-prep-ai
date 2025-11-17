@@ -124,7 +124,7 @@ const Dashboard = () => {
               <Card.Text>
                 Get professional attire recommendations and style guidance.
               </Card.Text>
-              <Button variant="warning" onClick={() => alert('Feature coming soon!')}>
+              <Button variant="warning" onClick={() => navigate('/dressing-sense')}>
                 Get Style Tips
               </Button>
             </Card.Body>

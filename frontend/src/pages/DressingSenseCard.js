@@ -17,17 +17,10 @@ import {
   Badge
 } from 'react-bootstrap';
 
-// --- Placeholder/Mock Data and Logic (Replace with actual API calls) ---
-// Since we don't have the actual Firestore connection in React, we simulate it
-// Use the same structure as Resume and Posture history items
-const mockHistoryData = [
-  { docId: 'ds1', score: 85, feedback: 'Excellent professional attire. Great job on the tie selection!', timestamp: { _seconds: Date.now() / 1000 - 86400 } },
-  { docId: 'ds2', score: 68, feedback: 'The jacket fit is too loose. Consider tailoring.', timestamp: { _seconds: Date.now() / 1000 - 3600 } },
-  { docId: 'ds3', score: 92, feedback: 'Perfect score. Highly professional and polished.', timestamp: { _seconds: Date.now() / 1000 - 7200 } },
-];
-
+// --- Re-define useDressingSenseLogic for clarity and reliability ---
 const useDressingSenseLogic = (userId) => {
   const [history, setHistory] = useState([]);
+  const historyRef = useRef(history);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortKey, setSortKey] = useState("timestamp");
@@ -36,33 +29,80 @@ const useDressingSenseLogic = (userId) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
-  // GitHub Copilot Prompt for fetchHistory (Backend simulation)
-  /*
-  "In this React component using axios, create an async function `fetchDressingHistory`. This function should make a GET request to `/api/dress/history?userId=${userId}`. Set `isHistoryLoading` to true before the call and false in the finally block. On success, set the response data to the `history` state."
-  */
+  // Helper: normalize server entry shape (adjusting for backend save keys)
+  const normalizeEntry = (d) => {
+    // support nested shapes and various timestamp keys from simulated/backends
+    const docId = d?.id || d?.docId || d?.sessionId || d?._id || (d?.save_info && d.save_info.docId) || (d?.saveInfo && d.saveInfo.docId) || null;
+    const score = d?.score ?? d?.averageScore ?? d?.dressScore ?? d?.rating ?? (d?.data && (d.data.score ?? d.data.dressScore)) ?? null;
+    const feedback = d?.feedback ?? d?.message ?? d?.summary ?? (d?.data && (d.data.feedback || d.data.message)) ?? '';
+    const timestamp = d?.serverTimestamp ?? d?.saved_at ?? d?.savedAt ?? d?.server_time ?? d?.timestamp ?? d?.createdAt ?? d?.startedAt ?? (d?.data && (d.data.serverTimestamp || d.data.timestamp)) ?? null;
+
+    return {
+      docId,
+      score,
+      feedback,
+      timestamp,
+      optimistic: !!(d?.optimistic || d?.saving || d?._optimistic)
+    };
+  };
+
   const fetchDressingHistory = useCallback(async () => {
     setIsHistoryLoading(true);
     try {
-      // Call backend dressing history endpoint
       const resp = await axios.get(`/api/dress/history`, { params: { userId } });
-      // Backend may return { success, count, data } or an array directly
+      
+      // Assuming the backend history endpoint returns an array of documents (data)
       if (resp && resp.data) {
         const data = resp.data.data ?? resp.data.sessions ?? resp.data;
-        // Normalize entries to have docId, score, feedback, timestamp
-        const normalized = (Array.isArray(data) ? data : []).map((d) => ({
-          docId: d.id || d.docId || d.sessionId || (d._id || null),
-          score: d.score ?? d.averageScore ?? d.rating ?? null,
-          feedback: d.feedback ?? d.message ?? d.summary ?? '',
-          timestamp: d.serverTimestamp ?? d.timestamp ?? d.createdAt ?? d.startedAt ?? null,
-        }));
-        setHistory(normalized);
+        const arr = Array.isArray(data) ? data : [];
+        const normalized = arr.map(normalizeEntry);
+        // If the backend returned at least one authoritative record, reconcile optimistic entries.
+        if (normalized.length > 0) {
+          try {
+            // Find optimistic local entries
+            const optimisticLocal = historyRef.current.filter(h => !!h.optimistic);
+
+            // Build final list starting from server records
+            const finalList = [...normalized];
+
+            // Helper to simplify feedback for matching
+            const simplify = (s) => (s || '').toString().replace(/[\s\n]+/g, ' ').replace(/[\W_]+/g, ' ').toLowerCase().trim().slice(0, 120);
+
+            // For each optimistic local entry, try to find a match in server records by score and feedback similarity
+            optimisticLocal.forEach(opt => {
+              const optScore = opt.score;
+              const optFeedback = simplify(opt.feedback);
+              let matched = false;
+              for (const srv of normalized) {
+                if (srv && srv.score != null && optScore != null && srv.score === optScore) {
+                  const srvFeedback = simplify(srv.feedback);
+                  if (srvFeedback && optFeedback && (srvFeedback.startsWith(optFeedback) || optFeedback.startsWith(srvFeedback) || srvFeedback.includes(optFeedback) || optFeedback.includes(srvFeedback))) {
+                    matched = true;
+                    break;
+                  }
+                }
+              }
+              if (!matched) {
+                // keep optimistic entry if no matching server record was found
+                finalList.push(opt);
+              }
+            });
+
+            setHistory(finalList);
+          } catch (e) {
+            console.error('Failed to reconcile optimistic entries', e);
+            setHistory(normalized);
+          }
+        } else {
+          // No authoritative records returned; keep any optimistic local entries instead of clearing them.
+          // This preserves immediate UI feedback when the server hasn't persisted entries yet.
+        }
       } else {
-        setHistory([]);
+        // Do not overwrite existing history on empty/invalid responses; preserve optimistic entries.
       }
     } catch (err) {
       console.error('Failed to fetch dress history', err);
-      // fallback to mock data to keep UI functional
-      setHistory(mockHistoryData);
+      // Preserve existing history on error to avoid removing optimistic entries unexpectedly.
     } finally {
       setIsHistoryLoading(false);
     }
@@ -72,45 +112,59 @@ const useDressingSenseLogic = (userId) => {
     fetchDressingHistory();
   }, [fetchDressingHistory]);
 
-  // GitHub Copilot Prompt for handleConfirmDelete (Backend simulation)
-  /*
-  "In this React component using axios, create an async function `handleConfirmDelete`. This function should perform the delete action using the current `itemToDelete`. Make a POST request to `/api/dress/history/delete` with a payload of `{ userId, docId: itemToDelete.docId }`. On successful deletion, optimistically update the local `history` state by filtering out the deleted item. Finally, close the modal and reset `itemToDelete`."
-  */
+  // keep a ref to the latest history to avoid capturing it in fetchDressingHistory's deps
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
 
     try {
-      // Attempt to delete via backend. Prefer DELETE by docId if available.
-      if (itemToDelete.docId) {
-        await axios.delete(`/api/dress/history/${encodeURIComponent(itemToDelete.docId)}`);
-      } else {
-        // Fallback: POST delete with payload
-        await axios.post('/api/dress/history/delete', { userId, docId: itemToDelete.docId });
+      // Determine the identifier to delete. Backend accepts docId or sessionId.
+      const docIdToDelete = itemToDelete?.docId || itemToDelete?.sessionId || itemToDelete?.id || null;
+
+      if (!docIdToDelete) {
+        // Nothing to send to server — remove locally and warn the user that server deletion was skipped.
+        setHistory((prevHistory) => prevHistory.filter((it) => it !== itemToDelete));
+        alert('Local entry removed (no server id available).');
+        return;
       }
 
-      // Optimistically update local history
-      setHistory((prevHistory) => prevHistory.filter((it) => it.docId !== itemToDelete.docId));
-      // Optionally show a small success UI (alert kept for parity)
-      alert('History entry deleted successfully.');
+      // Use POST to delete via backend as requested
+      const resp = await axios.post('/api/dress/history/delete', { userId, docId: docIdToDelete });
+
+      // Optimistically update local history on success
+      if (resp && (resp.data?.success || resp.status === 200)) {
+        setHistory((prevHistory) => prevHistory.filter((it) => it.docId !== docIdToDelete && it.id !== docIdToDelete && it.sessionId !== docIdToDelete));
+      } else {
+        throw new Error('Server did not confirm deletion');
+      }
     } catch (err) {
-      console.error("Failed to delete history entry:", err);
-      alert("Failed to delete history entry.");
+      console.error('Failed to delete history entry:', err);
+      const backendMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message;
+      alert('Failed to delete history entry: ' + backendMessage);
     } finally {
       setShowDeleteModal(false);
       setItemToDelete(null);
     }
   };
-  
-  const clamp = (val) => {
-    const n = Number(val) || 0;
-    return Math.min(100, Math.max(0, Math.round(n)));
-  };
 
-  // Memoized filtered and sorted history, similar to ResumeAnalysisPage.js
+  // Allow callers to optimistically prepend a history entry (raw shape expected)
+  const prependHistory = (rawEntry) => {
+    try {
+      setHistory((prev) => [normalizeEntry(rawEntry), ...prev]);
+    } catch (e) {
+      console.error('Failed to prepend history entry', e);
+    }
+  };
+  
+  const clamp = (val) => Math.min(100, Math.max(0, Math.round(Number(val) || 0)));
+
+  // Memoized filtered and sorted history
   const processedHistory = useMemo(() => {
     let filtered = history;
     
-    // Filter by searchTerm (score, date)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter((item) => {
@@ -121,7 +175,6 @@ const useDressingSenseLogic = (userId) => {
       });
     }
 
-    // Sort
     filtered = [...filtered].sort((a, b) => {
       let aVal = a[sortKey];
       let bVal = b[sortKey];
@@ -136,7 +189,6 @@ const useDressingSenseLogic = (userId) => {
       }
     });
 
-    // Latest only
     if (showLatestOnly && filtered.length) {
       return [filtered[0]];
     }
@@ -160,7 +212,8 @@ const useDressingSenseLogic = (userId) => {
     showDeleteModal,
     setItemToDelete,
     clamp,
-    fetchDressingHistory // Allow the main component to refresh after analysis
+    fetchDressingHistory,
+    prependHistory
   };
 };
 
@@ -192,11 +245,12 @@ const DressingSensePage = () => {
     showDeleteModal,
     setItemToDelete,
     clamp,
+    prependHistory,
     fetchDressingHistory
   } = useDressingSenseLogic(userId);
+  
 
   const scoreVariant = (s) => (s >= 80 ? 'success' : s >= 60 ? 'warning' : 'danger');
-
   const handleFileChange = async (e) => {
     setError(null);
     setResult(null);
@@ -208,54 +262,72 @@ const DressingSensePage = () => {
       return;
     }
 
-    setPreview(URL.createObjectURL(f));
+    const oldPreview = preview;
+    const newPreview = URL.createObjectURL(f);
+    setPreview(newPreview);
+    if (oldPreview) URL.revokeObjectURL(oldPreview);
 
     const fd = new FormData();
-    // Assuming the backend Flask service is expecting 'imageFile' as per the plan.
-    fd.append('imageFile', f);
+    fd.append('file', f);
+    fd.append('userId', userId);
 
     try {
       setLoading(true);
       const resp = await axios.post('/api/proxy-dress-analysis', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60_000
+        // Increase client timeout to 120s to match server/LLM processing time
+        timeout: 120000
       });
 
-      if (resp && resp.data) {
-        const data = resp.data;
-        const score = data.posture_score ?? data.score ?? data.dressScore ?? data.rating ?? null;
-        const feedback = data.feedback ?? data.message ?? data.comment ?? null;
-        setResult({ score, feedback, raw: data });
+      const respRoot = resp.data || {};
+      const analysis = respRoot.analysis || respRoot;
+      const saveInfo = respRoot.save_info || respRoot.saveInfo || analysis.save_info || analysis.saveInfo || respRoot;
 
-        // Automatically save the final output to history (backend will persist if configured)
-        try {
-          await axios.post('/api/dress/save-session', {
-            userId,
-            sessionData: { score, feedback }
-          });
-        } catch (saveErr) {
-          console.error('Failed to auto-save dress session:', saveErr?.response?.data || saveErr.message || saveErr);
-        }
+      let docIdCandidate = saveInfo?.docId || respRoot?.docId || analysis?.docId || analysis?.sessionId || null;
+      const score = analysis?.score ?? analysis?.dressScore ?? analysis?.rating ?? null;
+      const feedback = analysis?.feedback ?? analysis?.message ?? analysis?.comment ?? '';
 
-        // Refresh history after attempting to save
-        await fetchDressingHistory();
-      } else {
-        setError('No response data from dress analysis service.');
+      // If backend didn't provide a docId, create a temporary one and mark optimistic
+      let tempId = null;
+      if (!docIdCandidate) {
+        tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
       }
+      const finalDocId = docIdCandidate || tempId;
+      const optimistic = !docIdCandidate;
+
+      // Build a raw history shape compatible with normalizeEntry and prepend optimistically
+      if (finalDocId) {
+        const newRaw = {
+          id: finalDocId,
+          docId: finalDocId,
+          score,
+          feedback,
+          serverTimestamp: new Date().toISOString(),
+          optimistic: optimistic
+        };
+        prependHistory(newRaw);
+      }
+
+      setResult({ score, feedback, raw: analysis });
+
+      // Refresh history in background
+      fetchDressingHistory();
+
     } catch (err) {
       console.error('Dress analysis error:', err);
-      setError(err?.response?.data?.error || err?.message || 'Dress analysis failed');
+      const backendError = err?.response?.data?.error || err?.response?.data?.message;
+      setError(backendError || err.message || 'Dress analysis failed');
     } finally {
       setLoading(false);
     }
   };
 
+  // Export and Delete Handlers (unchanged)
   const handleExport = () => {
     if (!history.length) return;
     const headers = ["Date", "Score", "Feedback"];
     const rows = history.map((h) => {
       let dateStr = h.timestamp?._seconds ? new Date(h.timestamp._seconds * 1000).toLocaleString() : new Date(h.timestamp).toLocaleString();
-      // Simple sanitization for feedback that might contain commas
       const cleanFeedback = (h.feedback || "").replace(/,/g, ';').replace(/\n/g, ' '); 
       return [
         dateStr,
@@ -332,7 +404,7 @@ const DressingSensePage = () => {
                     ) : preview ? (
                       <div className='w-100 d-flex flex-column align-items-center'>
                          <Image src={preview} alt='preview' fluid rounded className='mb-3' style={{ maxHeight: 200, objectFit: 'contain' }} />
-                        {result?.score !== null ? (
+                        {result && result.score != null ? (
                           <div className='w-100 mt-2'>
                             <h6 className='fw-semibold mb-2'>Professionalism Score</h6>
                             <div className={`text-center fs-4 fw-bold mb-2 text-${scoreVariant(result.score)}`}>{Number(result.score).toFixed(1)} / 100</div>
@@ -354,8 +426,32 @@ const DressingSensePage = () => {
           </Row>
         </Card.Body>
       </Card>
+
+      {/* NEW: Professional Styling Tips Card */}
+      <Card className='mb-4 shadow'>
+        <Card.Body>
+          <Card.Title as='h3' className='mb-3'>💼 Professional Styling Tips</Card.Title>
+          <Row>
+            <Col md={4} className='mb-3'>
+              <Alert variant='success' className='mb-0'>
+                <strong>Focus on Fit:</strong> Tailored clothing looks polished. A well-fitted jacket and trousers are essential for a professional impression.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='info' className='mb-0'>
+                <strong>Keep Colors Neutral:</strong> Stick to navy, charcoal gray, or black for primary pieces. Accent with a clean white or light blue shirt.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='warning' className='mb-0'>
+                <strong>Avoid Casual Fabrics:</strong> Materials like linen, straw (hats), denim, or short sleeves are often too casual for a strict corporate interview.
+              </Alert>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
       
-      {/* History Card - Styled like ResumeAnalysisPage */}
+      {/* History Card */}
       <Card className='mb-4 shadow'>
         <Card.Body>
           <Card.Title as='h3' className='mb-3'>Dressing Sense History</Card.Title>
@@ -430,9 +526,11 @@ const DressingSensePage = () => {
                           variant="danger"
                           size="sm"
                           onClick={() => handleDeleteClick(h)}
+                          disabled={!!h.optimistic}
                         >
                           Delete
                         </Button>
+                        {h.optimistic && <Badge bg="secondary" className="ms-2">Saving...</Badge>}
                       </td>
                     </tr>
                   );
@@ -447,7 +545,7 @@ const DressingSensePage = () => {
         </Card.Body>
       </Card>
       
-      {/* Delete Confirmation Modal - Copied from ResumeAnalysisPage */}
+      {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Deletion</Modal.Title>
