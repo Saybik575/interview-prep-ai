@@ -15,6 +15,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const ResumeAnalysisPage = React.lazy(() => import('./pages/ResumeAnalysisPage'));
 const MockInterviewPage = React.lazy(() => import('./pages/MockInterviewPage'));
 const PostureAnalyzer = React.lazy(() => import('./pages/PostureAnalyzer'));
+const DressingSenseCard = React.lazy(() => import('./pages/DressingSenseCard'));
 
 const LoadingScreen = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -38,6 +39,7 @@ export const router = createBrowserRouter(
     { path: '/resume-analysis', element: <ResumeAnalysisPage /> },
     { path: '/mock-interview', element: <MockInterviewPage /> },
     { path: '/posture-analyzer', element: <PostureAnalyzer /> },
+    { path: '/dressing-sense', element: <DressingSenseCard /> },
     { path: '*', element: <Navigate to="/" replace /> },
   ],
   {

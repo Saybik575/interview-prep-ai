@@ -3,6 +3,8 @@ from flask import Flask, request, jsonify
 import requests
 import json
 from flask_cors import CORS
+import argparse
+from datetime import datetime # <-- FIX: Explicitly import datetime class
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama2:7b")
@@ -11,54 +13,53 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama2:7b")
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# --- Interview Logic Routes ---
 
-
-
-@app.route("/interview", methods=["POST"])
-def interview():
+@app.route("/interview/start", methods=["POST"])
+def start_interview():
+    # This route must exist to handle the initial setup request from the client
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "Missing JSON body"}), 400
     job_position = data.get("job_position")
     difficulty = data.get("difficulty")
-    messages = data.get("messages")
-    if not job_position or not difficulty or not isinstance(messages, list):
-        return jsonify({"error": "Missing or invalid fields: job_position, difficulty, messages (list) required."}), 400
+    user_id = data.get("userId") # Passed for history logging
 
-    # Construct system/context message
+    # Generate the initial system message and the first question
     system_prompt = (
         f"You are an AI interviewer for the position of {job_position} at {difficulty} level. "
-        "Ask one question at a time, analyze answers, and provide feedback when appropriate. "
-        "Do not repeat questions or topics already discussed in this interview. Each new question should be unique and cover a different aspect relevant to the position and difficulty."
+        "Your first message should be a brief greeting and the first technical question relevant to the role. "
+        "Ask only one question at a time. Do not provide feedback in this first message."
     )
     ollama_messages = [
-        {"role": "system", "content": system_prompt}
-    ] + messages
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Please start the interview now for {job_position} at {difficulty} level."}
+    ]
 
     payload = {
         "model": OLLAMA_MODEL,
         "messages": ollama_messages
     }
+    
+    # --- Ollama API Call (Simpler structure for starting convo) ---
     try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=300, stream=True)
+        resp = requests.post(OLLAMA_URL, json=payload, timeout=300)
         resp.raise_for_status()
-        # Ollama streams JSON objects, one per line
-        ai_message_content = ""
-        for line in resp.iter_lines():
-            if line:
-                try:
-                    obj = json.loads(line.decode('utf-8'))
-                    if "message" in obj and "content" in obj["message"]:
-                        ai_message_content += obj["message"]["content"]
-                except Exception:
-                    continue
-        if not ai_message_content:
-            return jsonify({"error": "No AI response from Ollama."}), 500
-        return jsonify({"ai_message": {"role": "assistant", "content": ai_message_content}})
+        # Non-streaming response expected for start message
+        response_data = resp.json()
+        ai_message_content = response_data['message']['content']
+        
+        # NOTE: In a real app, you would log the session start to Firestore and get a real ID.
+        # FIX: Use imported datetime class to generate session ID
+        session_id = f"mock_sess_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        return jsonify({
+            "ai_message": {"role": "assistant", "content": ai_message_content},
+            "sessionId": session_id # Return a temporary ID
+        })
     except requests.RequestException as e:
-        return jsonify({"error": f"Ollama server error: {str(e)}"}), 500
+        return jsonify({"error": f"Ollama server error (Start Interview): {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
 
 def build_evaluation_prompt(question, answer, history, job_position, difficulty):
     return f"""
@@ -76,7 +77,7 @@ Provide:
 - Areas for improvement (as 'improvement')
 - The next interview question (as 'next_question')
 
-Respond in this JSON format:
+Respond strictly in this JSON format:
 {{
   "score": <score>,
   "positive_feedback": "<feedback>",
@@ -85,12 +86,13 @@ Respond in this JSON format:
 }}
 """
 
-@app.route("/evaluate", methods=["POST"])
+@app.route("/interview/evaluate", methods=["POST"])
 def evaluate():
     data = request.get_json()
     job_position = data.get("job_position")
     difficulty = data.get("difficulty")
     messages = data.get("messages", [])
+    session_id = data.get("sessionId")
     if not job_position or not difficulty or not messages:
         return jsonify({"error": "Missing required fields."}), 400
 
@@ -109,29 +111,27 @@ def evaluate():
         job_position,
         difficulty
     )
+    
     payload = {
         "model": OLLAMA_MODEL,
         "messages": [
             {"role": "system", "content": prompt}
         ]
     }
+    
     try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=300, stream=True)
+        resp = requests.post(OLLAMA_URL, json=payload, timeout=300) # Use the non-streaming endpoint for evaluation
         resp.raise_for_status()
-        response_text = ""
-        for line in resp.iter_lines():
-            if line:
-                try:
-                    obj = json.loads(line.decode('utf-8'))
-                    if "message" in obj and "content" in obj["message"]:
-                        response_text += obj["message"]["content"]
-                except Exception:
-                    continue
+        response_text = resp.json()['message']['content']
+        
         # Try to parse the response as JSON
         try:
             feedback = json.loads(response_text)
         except Exception:
             return jsonify({"error": "LLM did not return valid JSON.", "raw": response_text}), 500
+            
+        # NOTE: In a real app, you would save this question/answer pair to Firestore here.
+
         return jsonify(feedback)
     except requests.RequestException as e:
         return jsonify({"error": f"Ollama server error: {str(e)}"}), 500
@@ -139,6 +139,10 @@ def evaluate():
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
-
+# --- Entrypoint with Port Argument Handling ---
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    parser = argparse.ArgumentParser(description="Mock Interview Flask Service")
+    parser.add_argument("--port", type=int, default=5001, help="Port to run the service on.")
+    args = parser.parse_args()
+
+    app.run(host="0.0.0.0", port=args.port, debug=True)

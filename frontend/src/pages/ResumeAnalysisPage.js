@@ -9,6 +9,9 @@ import {
   Table,
   Spinner,
   Modal,
+  Row,
+  Col,
+  Alert,
 } from "react-bootstrap";
 
 const ResumeAnalysisPage = () => {
@@ -224,6 +227,31 @@ const ResumeAnalysisPage = () => {
           </Form>
         </Card.Body>
       </Card>
+
+      {/* NEW: Resume Optimization Tips */}
+      <Card className='mb-4 shadow'>
+        <Card.Body>
+          <Card.Title as='h3' className='mb-3'>✍️ Resume Optimization Tips</Card.Title>
+          <Row>
+            <Col md={4} className='mb-3'>
+              <Alert variant='success' className='mb-0'>
+                <strong>Tailor Keywords:</strong> Mirror the job description's exact terminology to pass ATS filters.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='info' className='mb-0'>
+                <strong>Use Metrics:</strong> Replace general duties with quantifiable achievements (e.g., "Increased sales by 15%").
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='warning' className='mb-0'>
+                <strong>Maintain Formatting:</strong> Use clear headings, standard fonts, and avoid complex graphics to ensure ATS compatibility.
+              </Alert>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+      {/* END NEW TIPS */}
 
       {analysisResult && !analysisResult.error && (
         <Card className="mb-4 shadow">

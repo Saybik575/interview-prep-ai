@@ -56,6 +56,12 @@ fi
 if ! check_port 5001; then
     exit 1
 fi
+if ! check_port 5002; then
+    exit 1
+fi
+if ! check_port 5003; then
+    exit 1
+fi
 if ! check_port 8000; then
     exit 1
 fi
@@ -63,67 +69,68 @@ if ! check_port 8001; then
     exit 1
 fi
 if ! check_port 11434; then
-    echo "⚠️ Port 11434 is already in use. Checking if it's the mock interview service..."
-    # Try a lightweight HTTP probe (adjust path if your service exposes a health endpoint)
+    echo "⚠️ Port 11434 is already in use. Checking if it's the Ollama service..."
     if command -v curl >/dev/null 2>&1; then
         if curl -s --max-time 2 http://localhost:11434/ >/dev/null 2>&1; then
-            echo "✅ Existing mock interview service detected on port 11434. Will reuse it."
-            MOCK_ALREADY_RUNNING=1
+            echo "✅ Existing Ollama service detected on port 11434. Will reuse it."
+            OLLAMA_ALREADY_RUNNING=1
         else
-            echo "❌ Port 11434 is occupied by an unknown process. Please free it or set SKIP_11434=1 to bypass."
-            echo "   To find & kill on Windows (PowerShell):"
-            echo "     netstat -ano | findstr :11434"
-            echo "     taskkill /PID <PID> /F"
-            echo "   Git Bash: netstat -ano | grep 11434"
+            echo "❌ Port 11434 is occupied by an unknown process. Please free it."
             exit 1
         fi
     else
         echo "ℹ️ curl not available; assuming existing service is valid. Reusing port 11434."
-        MOCK_ALREADY_RUNNING=1
+        OLLAMA_ALREADY_RUNNING=1
     fi
 fi
-echo "✅ Ports 3000, 5000, 5001, 8000, 8001 are available (11434 reused if already running)"
+echo "✅ Ports 3000, 5000, 5001, 5002, 5003, 8000, 8001 are available (11434 reused if already running)"
 echo ""
 
-# Start backend
-echo "🔧 Starting backend server..."
+# Start Flask dressing-analysis-service
+echo "👗 Starting dressing analysis service (Flask)..."
+cd backend/dressing-analysis-service
+python yolo_dressing_service.py &
+DRESS_PID=$!
+cd ../..
+
+# Start backend (Express proxy)
+echo "🔧 Starting backend server (Express proxy)..."
+export DRESS_ANALYZE_URL="http://localhost:5002/api/analyze-dress"
+export MOCK_INTERVIEW_URL="http://localhost:5003" # <-- New setting for Express to proxy to
 cd backend
 npm run dev &
 BACKEND_PID=$!
 cd ..
 
-
 # Start Flask resume-analysis-service
-echo "🧠 Starting Flask resume analysis service..."
+echo "🧠 Starting Flask resume analysis service (8000)..."
 cd backend/resume-analysis-service
 python app.py &
 FLASK_PID=$!
 cd ../..
 
-# Start Flask mock-interview-service (only if not already running)
-if [ -z "$MOCK_ALREADY_RUNNING" ]; then
-    echo "🤖 Starting Flask mock interview service..."
-    cd backend/mock-interview-service
-    python app.py &
-    MOCK_PID=$!
-    cd ../..
-else
-    echo "🤖 Mock interview service already running; skipping start."
-fi
-
 # Start Flask resume-analysis-service history API
-echo "📚 Starting Flask resume history service..."
+echo "📚 Starting Flask resume history service (8001)..."
 cd backend/resume-analysis-service
 python history_api.py &
 HISTORY_PID=$!
 cd ../..
 
 # Start Flask posture-analysis-service
-echo "🧘 Starting Flask posture analysis service..."
+echo "🧘 Starting Flask posture analysis service (5001)..."
 cd backend/posture-analysis-service
 python yolo_posture_service.py &
 POSTURE_PID=$!
 cd ../..
+
+# Start Flask mock-interview-service on dedicated port 5003
+echo "🤖 Starting Flask mock interview service (5003)..."
+cd backend/mock-interview-service
+# The Flask run command must accept a port argument or use an environment variable
+python app.py --port 5003 & 
+MOCK_PID=$!
+cd ../..
+
 
 # Wait a moment for backend and Flask to start
 sleep 3
@@ -139,12 +146,13 @@ echo ""
 echo "🎉 All services are starting up!"
 echo ""
 echo "📱 Frontend: http://localhost:3000"
-echo "🔧 Backend (Express): http://localhost:5000"
+echo "🔧 Backend (Express Proxy): http://localhost:5000"
+echo "🤖 Mock Interview Service: http://localhost:5003"
 echo "🧠 Resume Analysis Service: http://localhost:8000"
 echo "📚 Resume History Service: http://localhost:8001"
-echo "🧘 Posture Analysis Service: http://localhost:5001 (Flask)"
-echo "🤖 Mock Interview Service: http://localhost:11434"
-echo ""
+echo "🧘 Posture Analysis Service: http://localhost:5001"
+echo "👗 Dressing Analysis Service: http://localhost:5002"
+echo "---"
 echo "Press Ctrl+C to stop all services"
 
 # Function to cleanup on exit
@@ -153,15 +161,12 @@ cleanup() {
     echo ""
     echo "🛑 Stopping services..."
     kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
+    kill $FRONTEND_PID 2>/devs/null
     kill $FLASK_PID 2>/dev/null
-    if [ -n "$MOCK_PID" ]; then
-        kill $MOCK_PID 2>/dev/null
-    else
-        echo "ℹ️ Mock interview service was pre-existing; not stopping it."
-    fi
+    kill $MOCK_PID 2>/dev/null
     kill $HISTORY_PID 2>/dev/null
     kill $POSTURE_PID 2>/dev/null
+    kill $DRESS_PID 2>/dev/null
     echo "✅ Services stopped"
     exit 0
 }
@@ -169,5 +174,5 @@ cleanup() {
 # Set trap to cleanup on script exit
 trap cleanup SIGINT SIGTERM
 
-# Wait for both processes
-wait 
+# Wait for all processes
+wait

@@ -113,3 +113,5 @@ backend/mock-interview-service/venv/
 backend/resume-analysis-service/.env
 backend/posture-analysis-service/.env
 backend/mock-interview-service/.env
+backend/dressing-analysis-service/.env
+backend/**/firebase-key.json

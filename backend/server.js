@@ -14,6 +14,8 @@ dotenv.config();
 
 const app = express();
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
+// Memory storage multer instance for proxying files directly without writing to disk
+const uploadMemory = multer({ storage: multer.memoryStorage() });
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -218,6 +220,166 @@ app.post('/api/posture/save-session', async (req, res) => {
 // Interview proxy route
 const interviewRouter = require('./routes/interview');
 // Attach db to app and router for Firestore access in routes
+// Proxy dress analysis to Flask backend: accept imageFile (memory) and forward as multipart/form-data
+// Proxy dress analysis to Flask backend: accept 'file' (memory) and forward as multipart/form-data
+app.post('/api/proxy-dress-analysis', uploadMemory.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No image uploaded (expected field name 'file')" });
+
+    // Build multipart form with the buffer
+    const FormData = require('form-data');
+    const form = new FormData();
+    // Forward as 'file' so Flask can access request.files.get('file') or request.files.get('outfitImage')
+    form.append('file', req.file.buffer, {
+      filename: req.file.originalname || 'upload.jpg',
+      contentType: req.file.mimetype || 'image/jpeg'
+    });
+
+    // Forward to Flask analyze-dress endpoint
+    const flaskUrl = process.env.DRESS_ANALYZE_URL || 'http://localhost:5001/api/analyze-dress';
+    // Increase timeout to 120s to match backend LLM request timeout and avoid
+    // client-side cancellations for longer model generations.
+    const response = await axios.post(flaskUrl, form, { headers: form.getHeaders(), timeout: 120_000 });
+
+    // Forward Flask response JSON back to client
+    if (response && response.data) {
+      return res.status(response.status || 200).json(response.data);
+    }
+    // If no JSON data, return 502
+    return res.status(502).json({ error: 'Bad gateway: empty response from analysis service' });
+  } catch (err) {
+    console.error('Error proxying dress analysis:', err?.response?.data || err.message || err);
+    if (err.response && err.response.data) {
+      // Forward error from Flask if available
+      return res.status(err.response.status || 500).json(err.response.data);
+    }
+    return res.status(500).json({ error: 'Failed to proxy dress analysis', message: err.message });
+  }
+});
+
+// Dress session save endpoint (mirrors posture save logic)
+app.post('/api/dress/save-session', async (req, res) => {
+  try {
+    const { userId, sessionData } = req.body;
+    if (!userId || !sessionData) return res.status(400).json({ error: 'Missing required fields: userId and sessionData' });
+
+    const sessionRecord = {
+      ...sessionData,
+      userId,
+      sessionId: `dress_${Date.now()}_${userId.substring(0,8)}`,
+      serverTimestamp: new Date().toISOString(),
+      status: 'completed'
+    };
+
+    if (db) {
+      const docRef = await db.collection('dress_sessions').add(sessionRecord);
+      console.log('Dress session saved to Firestore:', docRef.id);
+      return res.json({ success: true, message: 'Dress session saved', docId: docRef.id, data: sessionRecord });
+    }
+
+    console.log('Dress session (Firestore not configured):', sessionRecord);
+    return res.json({ success: true, message: 'Dress session processed (no Firestore)', data: sessionRecord });
+  } catch (err) {
+    console.error('Error saving dress session:', err);
+    return res.status(500).json({ error: 'Failed to save dress session', message: err.message });
+  }
+});
+
+// Dress session history endpoint
+app.get('/api/dress/history', async (req, res) => {
+  try {
+    const { userId, limit = 50 } = req.query;
+    if (!userId) return res.status(400).json({ error: 'Missing required query param: userId' });
+    if (!db) {
+      console.log(`Dress history requested (no Firestore) for userId=${userId}`);
+      return res.json({ success: true, count: 0, data: [] });
+    }
+
+    const max = Number(limit) || 50;
+    let sessions = [];
+    try {
+      const snapshot = await db.collection('dress_sessions')
+        .where('userId', '==', userId)
+        .orderBy('serverTimestamp', 'desc')
+        .limit(max)
+        .get();
+      sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+      if (err && (err.code === 9 || err.code === 'FAILED_PRECONDITION')) {
+        if (!postureIndexWarned) { console.warn('Missing index for dress history; falling back to client sort'); postureIndexWarned = true; }
+        const snapshot = await db.collection('dress_sessions').where('userId', '==', userId).get();
+        sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a,b) => (b.serverTimestamp || '').localeCompare(a.serverTimestamp || '')).slice(0, max);
+        return res.json({ success: true, count: sessions.length, data: sessions, fallbackUsed: true });
+      } else {
+        throw err;
+      }
+    }
+
+    return res.json({ success: true, count: sessions.length, data: sessions, fallbackUsed: false });
+  } catch (err) {
+    console.error('Error fetching dress history:', err);
+    return res.status(500).json({ error: 'Failed to fetch dress history', message: err.message });
+  }
+});
+
+// Delete dress session
+app.delete('/api/dress/history/:docId', async (req, res) => {
+  const { docId } = req.params;
+  console.log(`[DressDelete] Received delete request docId=${docId}`);
+  try {
+    if (!docId) return res.status(400).json({ error: 'Missing docId' });
+    if (!db) { console.warn('[DressDelete] Firestore not configured; returning success (dev mode)'); return res.json({ success: true, docId, warning: 'Firestore not configured' }); }
+    const docRef = db.collection('dress_sessions').doc(docId);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      console.warn(`[DressDelete] docId=${docId} not found; returning success for idempotency`);
+      return res.json({ success: true, docId, warning: 'Session not found (idempotent delete)' });
+    }
+    await docRef.delete();
+    console.log(`[DressDelete] Deleted docId=${docId}`);
+    return res.json({ success: true, docId });
+  } catch (err) {
+    console.error('[DressDelete] Error deleting:', err);
+    return res.status(500).json({ error: 'Failed to delete dress session', message: err.message });
+  }
+});
+// Also accept POST-based delete for clients that can't issue DELETE (frontend uses this)
+app.post('/api/dress/history/delete', async (req, res) => {
+  try {
+    const { userId, docId } = req.body;
+    console.log(`[DressDeletePOST] Received delete request userId=${userId} docId=${docId}`);
+    if (!docId) return res.status(400).json({ error: 'Missing docId' });
+    // Mirror behavior of DELETE endpoint
+    if (!db) {
+      console.warn('[DressDeletePOST] Firestore not configured; returning success (dev mode)');
+      return res.json({ success: true, docId, warning: 'Firestore not configured' });
+    }
+
+    const docRef = db.collection('dress_sessions').doc(docId);
+    const snap = await docRef.get();
+    if (snap.exists) {
+      await docRef.delete();
+      console.log(`[DressDeletePOST] Deleted docId=${docId}`);
+      return res.json({ success: true, docId });
+    }
+
+    // Attempt delete by sessionId field if direct doc id not found
+    const querySnapshot = await db.collection('dress_sessions').where('sessionId', '==', docId).limit(1).get();
+    if (!querySnapshot.empty) {
+      const matchedDoc = querySnapshot.docs[0];
+      await matchedDoc.ref.delete();
+      console.log(`[DressDeletePOST] Deleted by sessionId=${docId} (docId=${matchedDoc.id})`);
+      return res.json({ success: true, docId: matchedDoc.id, deletedBy: 'sessionId' });
+    }
+
+    console.warn(`[DressDeletePOST] docId/sessionId=${docId} not found; returning success for idempotency`);
+    return res.json({ success: true, docId, warning: 'Session not found (idempotent delete)' });
+  } catch (err) {
+    console.error('[DressDeletePOST] Error deleting:', err);
+    return res.status(500).json({ error: 'Failed to delete dress session', message: err.message });
+  }
+});
 if (db) {
   app.set('db', db);
   interviewRouter.db = db;

@@ -236,14 +236,26 @@ const PostureAnalyzer = () => {
         </Card.Body>
       </Card>
 
-      {/* Posture Tips */}
+      {/* Posture Tips (UPDATED UI) */}
       <Card className='mb-4 shadow'>
         <Card.Body>
-          <Card.Title as='h3' className='mb-3'>Posture Tips</Card.Title>
+          <Card.Title as='h3' className='mb-3'>🧘 Posture Tips</Card.Title>
           <Row>
-            <Col md={4} className='mb-3'><Alert variant='info' className='mb-0'><strong>Sit Up Straight:</strong> Keep your back straight and shoulders relaxed.</Alert></Col>
-            <Col md={4} className='mb-3'><Alert variant='info' className='mb-0'><strong>Eye Level:</strong> Position your camera at eye level.</Alert></Col>
-            <Col md={4} className='mb-3'><Alert variant='info' className='mb-0'><strong>Shoulders Back:</strong> Avoid slouching forward.</Alert></Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='success' className='mb-0'>
+                <strong>Sit Up Straight:</strong> Keep your back straight and shoulders relaxed.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='info' className='mb-0'>
+                <strong>Eye Level:</strong> Position your camera at eye level to prevent head tilt.
+              </Alert>
+            </Col>
+            <Col md={4} className='mb-3'>
+              <Alert variant='warning' className='mb-0'>
+                <strong>Shoulders Back:</strong> Consciously avoid slouching forward during the interview.
+              </Alert>
+            </Col>
           </Row>
         </Card.Body>
       </Card>
