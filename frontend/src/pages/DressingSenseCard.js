@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../api/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -266,7 +266,7 @@ const DressingSensePage = () => {
 
     try {
       setLoading(true);
-      const resp = await axios.post('/api/proxy-dress-analysis', fd, {
+      const resp = await api.post('/api/proxy-dress-analysis', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
         // Increase client timeout to 120s to match server/LLM processing time
         timeout: 120000

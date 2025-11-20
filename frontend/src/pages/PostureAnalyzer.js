@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { auth } from '../firebase';
+import api from '../api/config';
 import { Container, Card, Button, Spinner, Alert, Row, Col, ProgressBar, Badge, Form, Table, Modal } from 'react-bootstrap';
 
 const PostureAnalyzer = () => {

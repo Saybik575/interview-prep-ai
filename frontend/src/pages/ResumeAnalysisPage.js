@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import axios from "axios";
+import api from "../api/config";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -56,7 +56,7 @@ const ResumeAnalysisPage = () => {
     
     setIsHistoryLoading(true);
     try {
-      const response = await axios.get(`/api/resume/history?userId=${userId}`);
+      const response = await api.get(`/api/resume/history?userId=${userId}`);
       setHistory(response.data);
     } catch (err) {
       console.error("Failed to fetch resume history", err);
@@ -84,7 +84,7 @@ const ResumeAnalysisPage = () => {
     formData.append("userId", userId);
 
     try {
-      const res = await axios.post("/api/resume", formData, {
+      const res = await api.post("/api/resume", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -92,7 +92,7 @@ const ResumeAnalysisPage = () => {
       fetchHistory(); // Refresh history after new analysis
     } catch (err) {
       console.error("Error analyzing resume:", err);
-      setAnalysisResult({ error: "Resume analysis failed." });
+      setAnalysisResult({ error: err.message || "Resume analysis failed." });
     }
     setLoading(false);
   };
@@ -107,7 +107,7 @@ const ResumeAnalysisPage = () => {
 
     try {
       const payload = { userId, docId: itemToDelete.docId };
-      await axios.post("/api/resume/history/delete", payload);
+      await api.post("/api/resume/history/delete", payload);
 
       // Optimistically remove the item from local state
       setHistory((prevHistory) =>

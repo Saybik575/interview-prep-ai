@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import api from "../api/config";
 import { Container, Card, Form, Button, Row, Col, Alert, Table, Spinner, Modal } from "react-bootstrap";
 import MockInterviewChat from "./MockInterviewChat";
 import { auth } from "../firebase";
@@ -121,7 +121,7 @@ const MockInterviewPage = () => {
         setIsHistoryLoading(false);
         return;
       }
-      const res = await axios.get(`/api/interview/history?userId=${user.uid}`);
+      const res = await api.get(`/api/interview/history?userId=${user.uid}`);
       if (res.data && Array.isArray(res.data)) {
         // Convert Firestore Timestamp objects to Date objects
         const processedData = res.data.map(session => ({
@@ -155,7 +155,7 @@ const MockInterviewPage = () => {
     if (!itemToDelete) return;
 
     try {
-      const response = await axios.delete(`/api/interview/history/${itemToDelete.sessionId}`);
+      const response = await api.delete(`/api/interview/history/${itemToDelete.sessionId}`);
       
       // Remove from local state
       setHistory(prev => prev.filter(s => s.sessionId !== itemToDelete.sessionId));
@@ -183,7 +183,7 @@ const MockInterviewPage = () => {
       const userId = user ? user.uid : null;
       // Call Express proxy if exists, otherwise talk to Flask directly:
       // Express proxy endpoint: /api/interview/start
-      const res = await axios.post("/api/interview/start", {
+      const res = await api.post("/api/interview/start", {
         category,
         job_position: position,
         difficulty,
@@ -211,7 +211,7 @@ const MockInterviewPage = () => {
     try {
       const user = auth.currentUser;
       const userId = user ? user.uid : null;
-      const res = await axios.post("/api/interview/evaluate", {
+      const res = await api.post("/api/interview/evaluate", {
         category,
         job_position: position,
         difficulty,
