@@ -6,7 +6,6 @@ load_dotenv()
 from werkzeug.utils import secure_filename
 import docx2txt
 from pdfminer.high_level import extract_text
-from sentence_transformers import SentenceTransformer, util
 import json
 import language_tool_python
 from google.cloud import firestore
@@ -26,7 +25,6 @@ if os.path.exists('skills.json'):
     except Exception:
         pass
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
 tool = language_tool_python.LanguageTool('en-US')
 db = firestore.Client()
 
@@ -123,11 +121,15 @@ def analyze_resume():
 
         similarity_with_jd = None
         if job_description and job_description.strip():
+            # Simple keyword matching (replaces sentence-transformers for memory efficiency)
             try:
-                resume_emb = model.encode(text, convert_to_tensor=True)
-                jd_emb = model.encode(job_description, convert_to_tensor=True)
-                similarity = util.cos_sim(resume_emb, jd_emb).item()
-                similarity_with_jd = round(max(0.0, min(1.0, similarity)) * 100, 2)
+                jd_words_lower = set([w.lower().strip('.,:;()[]{}"\'') for w in job_description.split() if len(w) > 3])
+                resume_words_lower = set([w.lower().strip('.,:;()[]{}"\'') for w in text.split() if len(w) > 3])
+                common_words = jd_words_lower & resume_words_lower
+                if jd_words_lower:
+                    similarity_with_jd = round((len(common_words) / len(jd_words_lower)) * 100, 2)
+                else:
+                    similarity_with_jd = 0.0
             except Exception:
                 similarity_with_jd = None
 
