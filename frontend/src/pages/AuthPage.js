@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { FcGoogle } from 'react-icons/fc';
 import { Container, Card, Form, Button, Spinner } from 'react-bootstrap';
 
@@ -14,13 +14,29 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/dashboard');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
+
   const handleGoogle = async () => {
     setError('');
+    setLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      navigate('/dashboard');
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        navigate('/dashboard');
+      }
     } catch (e) {
-      setError(e.message);
+      console.error('Google sign-in error:', e);
+      setError(e.message || 'Failed to sign in with Google');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -113,9 +129,10 @@ const AuthPage = () => {
               variant="outline-secondary"
               className="w-100 d-flex align-items-center justify-content-center mb-2"
               onClick={handleGoogle}
+              disabled={loading}
             >
               <FcGoogle size={22} className="me-2" />
-              Sign in with Google
+              {loading ? 'Signing in...' : 'Sign in with Google'}
             </Button>
             <div className="text-center mt-3">
               <Button

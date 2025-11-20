@@ -9,18 +9,34 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const auth = getAuth();
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         navigate('/auth');
       } else {
-        await u.reload();
-        setUser(auth.currentUser);
+        try {
+          await u.reload();
+          setUser(auth.currentUser);
+        } catch (error) {
+          console.error('Error loading user:', error);
+        }
       }
+      setLoading(false);
     });
     return () => unsub();
   }, [auth, navigate]);
+
+  if (loading) {
+    return (
+      <Container className="py-5 text-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <Container className="py-5">
