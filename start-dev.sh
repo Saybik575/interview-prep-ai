@@ -104,6 +104,7 @@ cd ..
 
 # Start Flask resume-analysis-service
 echo "🧠 Starting Flask resume analysis service (8000)..."
+echo "   (Note: First startup may take 1-2 minutes due to ML model initialization)"
 cd backend/resume-analysis-service
 python app.py &
 FLASK_PID=$!
@@ -132,8 +133,8 @@ MOCK_PID=$!
 cd ../..
 
 
-# Wait a moment for backend and Flask to start
-sleep 3
+# Wait a moment for backend and Flask to start (increased to reduce race conditions)
+sleep 8
 
 # Start frontend
 echo "🎨 Starting frontend development server..."

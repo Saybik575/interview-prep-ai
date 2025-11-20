@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import GoogleLogo from '../assets/google.svg';
+import { FcGoogle } from 'react-icons/fc';
 import { Container, Card, Form, Button, Spinner } from 'react-bootstrap';
 
 const AuthPage = () => {
@@ -114,7 +114,7 @@ const AuthPage = () => {
               className="w-100 d-flex align-items-center justify-content-center mb-2"
               onClick={handleGoogle}
             >
-              <img src={GoogleLogo} alt="Google" style={{ width: 22, height: 22, marginRight: 8 }} />
+              <FcGoogle size={22} className="me-2" />
               Sign in with Google
             </Button>
             <div className="text-center mt-3">

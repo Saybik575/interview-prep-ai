@@ -263,55 +263,53 @@ const PostureAnalyzer = () => {
       {/* History Card */}
       <Card className='mb-4 shadow'>
         <Card.Body>
-          <Card.Title as='h3' className='mb-3'>Posture Session History</Card.Title>
-          <Row className='g-3 align-items-end mb-3'>
-            <Col sm={4}>
-              <Form.Control 
-                placeholder='Search by score or date...' 
-                value={searchTerm} 
-                onChange={e=>setSearchTerm(e.target.value)} />
-            </Col>
-            <Col sm={3}>
-              <Form.Select value={sortKey} onChange={e=>setSortKey(e.target.value)}>
-                <option value='serverTimestamp'>Sort by Date</option>
-                <option value='averageScore'>Sort by Avg Score</option>
-                <option value='totalAnalyses'>Sort by Analyses</option>
-              </Form.Select>
-            </Col>
-            <Col sm={2}>
-              <Form.Select value={sortDir} onChange={e=>setSortDir(e.target.value)}>
-                <option value='desc'>Desc</option>
-                <option value='asc'>Asc</option>
-              </Form.Select>
-            </Col>
-            <Col sm={2} className='d-flex gap-2'>
-              <Form.Check 
-                type='switch' 
-                id='latest-only' 
-                label='Latest' 
-                checked={showLatestOnly} 
-                onChange={e=>setShowLatestOnly(e.target.checked)} />
-            </Col>
-            <Col sm={1} className='text-end'>
-              <Button 
-                size='sm' 
-                variant='outline-secondary'
-                onClick={() => {
-                  // simple CSV export
-                  if (!displayedHistory.length) return;
-                  const headers = ['Date','Avg Score','Analyses'];
-                  const rows = displayedHistory.map(h => [h.serverTimestamp, h.averageScore, h.totalAnalyses]);
-                  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
-                  const blob = new Blob([csv], {type:'text/csv'});
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url; a.download = 'posture_history.csv'; a.click();
-                  URL.revokeObjectURL(url);
-                }}>Export</Button>
-            </Col>
-          </Row>
-          <div className='table-responsive'>
-            <Table striped bordered hover size='sm' className='mb-0'>
+          <Card.Title as='h3' className='mb-3'>History</Card.Title>
+          {/* Advanced Controls */}
+          <div className="d-flex flex-wrap gap-3 mb-3 align-items-center">
+            <Form.Control
+              type="text"
+              placeholder="Search by score or date..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ maxWidth: 280 }}
+            />
+            <Form.Select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value)}
+              style={{ maxWidth: 160 }}
+            >
+              <option value="serverTimestamp">Sort by Date</option>
+              <option value="averageScore">Sort by Avg Score</option>
+              <option value="totalAnalyses">Sort by Analyses</option>
+            </Form.Select>
+            <Form.Select
+              value={sortDir}
+              onChange={e => setSortDir(e.target.value)}
+              style={{ maxWidth: 120 }}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </Form.Select>
+            <Form.Check
+              type="switch"
+              id="latest-only-toggle"
+              label="Show Latest Only"
+              checked={showLatestOnly}
+              onChange={e => setShowLatestOnly(e.target.checked)}
+            />
+            <Button variant="outline-secondary" onClick={() => {
+              if (!displayedHistory.length) return;
+              const headers = ['Date','Avg Score','Analyses'];
+              const rows = displayedHistory.map(h => [h.serverTimestamp, h.averageScore, h.totalAnalyses]);
+              const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+              const blob = new Blob([csv], {type:'text/csv'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'posture_history.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}>Export</Button>
+          </div>
+          <Table striped bordered responsive className='mb-0'>
               <thead>
                 <tr>
                   <th>Date</th>
@@ -322,17 +320,21 @@ const PostureAnalyzer = () => {
               </thead>
               <tbody>
                 {historyLoading ? (
-                  <tr><td colSpan={4} className='text-center'><Spinner animation='border' size='sm' className='me-2'/> Loading...</td></tr>
+                  <tr>
+                    <td colSpan={4} className='text-center'>
+                      <Spinner animation='border' size='sm' className='me-2' /> Loading...
+                    </td>
+                  </tr>
                 ) : displayedHistory.length ? (
                   displayedHistory.map(h => (
                     <tr key={h.id}>
-                      <td>{h.serverTimestamp ? new Date(h.serverTimestamp).toLocaleString() : ''}</td>
-                      <td>{h.averageScore}</td>
+                      <td>{h.serverTimestamp ? new Date(h.serverTimestamp).toLocaleString() : 'N/A'}</td>
+                      <td>{h.averageScore}%</td>
                       <td>{h.totalAnalyses}</td>
                       <td>
                         <Button 
                           size='sm' 
-                          variant='danger'
+                          variant='outline-danger'
                           onClick={() => handleDeleteClick(h)}
                           disabled={deleteLoading === h.id}
                         >
@@ -342,11 +344,14 @@ const PostureAnalyzer = () => {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={4} className='text-center text-muted'>No history found.</td></tr>
+                  <tr>
+                    <td colSpan={4} className='text-center text-muted'>
+                      No posture history yet. Start your first session above!
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </Table>
-          </div>
         </Card.Body>
       </Card>
 

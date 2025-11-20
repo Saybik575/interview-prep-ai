@@ -16,6 +16,9 @@ import {
   Modal,
   Badge
 } from 'react-bootstrap';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { getAuth } from 'firebase/auth';
 
 // --- Re-define useDressingSenseLogic for clarity and reliability ---
 const useDressingSenseLogic = (userId) => {
@@ -47,62 +50,38 @@ const useDressingSenseLogic = (userId) => {
   };
 
   const fetchDressingHistory = useCallback(async () => {
+    if (!userId) return;
+    
     setIsHistoryLoading(true);
     try {
-      const resp = await axios.get(`/api/dress/history`, { params: { userId } });
+      // Fetch from Firestore dressing_sessions collection
+      const dressingSessionsRef = collection(db, 'dressing_sessions');
+      const q = query(
+        dressingSessionsRef,
+        where('userId', '==', userId),
+        orderBy('timestamp', 'desc')
+      );
       
-      // Assuming the backend history endpoint returns an array of documents (data)
-      if (resp && resp.data) {
-        const data = resp.data.data ?? resp.data.sessions ?? resp.data;
-        const arr = Array.isArray(data) ? data : [];
-        const normalized = arr.map(normalizeEntry);
-        // If the backend returned at least one authoritative record, reconcile optimistic entries.
-        if (normalized.length > 0) {
-          try {
-            // Find optimistic local entries
-            const optimisticLocal = historyRef.current.filter(h => !!h.optimistic);
-
-            // Build final list starting from server records
-            const finalList = [...normalized];
-
-            // Helper to simplify feedback for matching
-            const simplify = (s) => (s || '').toString().replace(/[\s\n]+/g, ' ').replace(/[\W_]+/g, ' ').toLowerCase().trim().slice(0, 120);
-
-            // For each optimistic local entry, try to find a match in server records by score and feedback similarity
-            optimisticLocal.forEach(opt => {
-              const optScore = opt.score;
-              const optFeedback = simplify(opt.feedback);
-              let matched = false;
-              for (const srv of normalized) {
-                if (srv && srv.score != null && optScore != null && srv.score === optScore) {
-                  const srvFeedback = simplify(srv.feedback);
-                  if (srvFeedback && optFeedback && (srvFeedback.startsWith(optFeedback) || optFeedback.startsWith(srvFeedback) || srvFeedback.includes(optFeedback) || optFeedback.includes(srvFeedback))) {
-                    matched = true;
-                    break;
-                  }
-                }
-              }
-              if (!matched) {
-                // keep optimistic entry if no matching server record was found
-                finalList.push(opt);
-              }
-            });
-
-            setHistory(finalList);
-          } catch (e) {
-            console.error('Failed to reconcile optimistic entries', e);
-            setHistory(normalized);
-          }
-        } else {
-          // No authoritative records returned; keep any optimistic local entries instead of clearing them.
-          // This preserves immediate UI feedback when the server hasn't persisted entries yet.
-        }
-      } else {
-        // Do not overwrite existing history on empty/invalid responses; preserve optimistic entries.
-      }
+      const querySnapshot = await getDocs(q);
+      const fetchedData = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedData.push({
+          docId: doc.id,
+          id: doc.id,
+          score: data.score,
+          feedback: data.feedback,
+          timestamp: data.timestamp,
+          imageUrl: data.imageUrl,
+          clothing_detected: data.clothing_detected,
+          optimistic: false
+        });
+      });
+      
+      setHistory(fetchedData);
     } catch (err) {
-      console.error('Failed to fetch dress history', err);
-      // Preserve existing history on error to avoid removing optimistic entries unexpectedly.
+      console.error('Failed to fetch dressing history from Firestore:', err);
     } finally {
       setIsHistoryLoading(false);
     }
@@ -121,29 +100,30 @@ const useDressingSenseLogic = (userId) => {
     if (!itemToDelete) return;
 
     try {
-      // Determine the identifier to delete. Backend accepts docId or sessionId.
-      const docIdToDelete = itemToDelete?.docId || itemToDelete?.sessionId || itemToDelete?.id || null;
+      // Get the document ID to delete
+      const docIdToDelete = itemToDelete?.docId || itemToDelete?.id || null;
 
       if (!docIdToDelete) {
-        // Nothing to send to server — remove locally and warn the user that server deletion was skipped.
-        setHistory((prevHistory) => prevHistory.filter((it) => it !== itemToDelete));
-        alert('Local entry removed (no server id available).');
+        alert('Cannot delete: No document ID available.');
+        setShowDeleteModal(false);
+        setItemToDelete(null);
         return;
       }
 
-      // Use POST to delete via backend as requested
-      const resp = await axios.post('/api/dress/history/delete', { userId, docId: docIdToDelete });
+      // Delete from Firestore dressing_sessions collection
+      const docRef = doc(db, 'dressing_sessions', docIdToDelete);
+      await deleteDoc(docRef);
+      
+      console.log('✅ Document deleted from Firestore:', docIdToDelete);
 
-      // Optimistically update local history on success
-      if (resp && (resp.data?.success || resp.status === 200)) {
-        setHistory((prevHistory) => prevHistory.filter((it) => it.docId !== docIdToDelete && it.id !== docIdToDelete && it.sessionId !== docIdToDelete));
-      } else {
-        throw new Error('Server did not confirm deletion');
-      }
+      // Update local state to remove the deleted item
+      setHistory((prevHistory) => prevHistory.filter((it) => 
+        it.docId !== docIdToDelete && it.id !== docIdToDelete
+      ));
+      
     } catch (err) {
-      console.error('Failed to delete history entry:', err);
-      const backendMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message;
-      alert('Failed to delete history entry: ' + backendMessage);
+      console.error('❌ Failed to delete document from Firestore:', err);
+      alert('Failed to delete: ' + err.message);
     } finally {
       setShowDeleteModal(false);
       setItemToDelete(null);
@@ -225,9 +205,22 @@ const DressingSensePage = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const auth = getAuth();
+  const [user, setUser] = useState(null);
 
-  // Replace with actual userId from auth context
-  const userId = "demoUser";
+  // Get actual userId from Firebase auth
+  const userId = user?.uid || null;
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        navigate('/auth');
+      }
+    });
+    return () => unsubscribe();
+  }, [auth, navigate]);
 
   const {
     isHistoryLoading,
@@ -286,6 +279,26 @@ const DressingSensePage = () => {
       let docIdCandidate = saveInfo?.docId || respRoot?.docId || analysis?.docId || analysis?.sessionId || null;
       const score = analysis?.score ?? analysis?.dressScore ?? analysis?.rating ?? null;
       const feedback = analysis?.feedback ?? analysis?.message ?? analysis?.comment ?? '';
+      const clothingDetected = analysis?.clothing_detected ?? analysis?.clothingDetected ?? analysis?.items ?? [];
+      const imageUrl = newPreview || null;
+
+      // Save to Firestore dressing_sessions collection
+      try {
+        const dressingSessionsRef = collection(db, 'dressing_sessions');
+        const docRef = await addDoc(dressingSessionsRef, {
+          userId: userId,
+          timestamp: serverTimestamp(),
+          feedback: feedback,
+          score: score,
+          clothing_detected: clothingDetected,
+          imageUrl: imageUrl
+        });
+        console.log('Document written with ID:', docRef.id);
+        docIdCandidate = docRef.id; // Use the Firestore document ID
+      } catch (firestoreError) {
+        console.error('❌ Failed to save to Firestore:', firestoreError);
+        // Continue even if Firestore save fails
+      }
 
       // If backend didn't provide a docId, create a temporary one and mark optimistic
       let tempId = null;
@@ -454,7 +467,8 @@ const DressingSensePage = () => {
       {/* History Card */}
       <Card className='mb-4 shadow'>
         <Card.Body>
-          <Card.Title as='h3' className='mb-3'>Dressing Sense History</Card.Title>
+          <Card.Title as='h3' className='mb-3'>History</Card.Title>
+          {/* Advanced Controls */}
           <div className="d-flex flex-wrap gap-3 mb-3 align-items-center">
             <Form.Control
               type="text"
@@ -507,11 +521,23 @@ const DressingSensePage = () => {
               ) : history.length ? (
                 history.map((h) => {
                   let dateStr = "";
-                  if (h.timestamp?._seconds) {
-                    dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
-                  } else if (h.timestamp) {
-                    const d = new Date(h.timestamp);
-                    dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
+                  if (h.timestamp) {
+                    try {
+                      // Handle Firestore Timestamp object
+                      if (h.timestamp.toDate && typeof h.timestamp.toDate === 'function') {
+                        dateStr = h.timestamp.toDate().toLocaleString();
+                      } else if (h.timestamp._seconds) {
+                        dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
+                      } else if (h.timestamp.seconds) {
+                        dateStr = new Date(h.timestamp.seconds * 1000).toLocaleString();
+                      } else {
+                        const d = new Date(h.timestamp);
+                        dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
+                      }
+                    } catch (e) {
+                      console.error('Error parsing timestamp:', e);
+                      dateStr = "";
+                    }
                   }
                   const previewText = (h.feedback || "").length > 50 ? h.feedback.substring(0, 47) + '...' : h.feedback;
                   return (
@@ -523,7 +549,7 @@ const DressingSensePage = () => {
                       <td>{previewText}</td>
                       <td>
                         <Button
-                          variant="danger"
+                          variant="outline-danger"
                           size="sm"
                           onClick={() => handleDeleteClick(h)}
                           disabled={!!h.optimistic}
@@ -537,7 +563,9 @@ const DressingSensePage = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={4} className="text-center">No history found.</td>
+                  <td colSpan={4} className="text-center text-muted">
+                    No dressing analysis history yet. Upload your first image above!
+                  </td>
                 </tr>
               )}
             </tbody>

@@ -1,18 +1,133 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 9, 23);
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
+    
+    // Check if authenticated user owns the document (by userId field)
+    function isDocumentOwner() {
+      return isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Check if authenticated user will own the new document (for creates)
+    function willBeDocumentOwner() {
+      return isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Check if user owns the resource by matching document ID
+    function isOwnerById(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
+    // Users can only access their own profile document
+    match /users/{userId} {
+      allow read, write: if isOwnerById(userId);
+      
+      // User history subcollection (all analysis types)
+      match /history/{historyId} {
+        allow read, write: if isOwnerById(userId);
+      }
+      
+      // User profile data subcollection
+      match /profile/{profileId} {
+        allow read, write: if isOwnerById(userId);
+      }
+    }
+    
+    // ============================================
+    // INTERVIEW SESSIONS COLLECTION
+    // ============================================
+    
+    match /interview_sessions/{sessionId} {
+      // Read: only if user owns this document
+      allow read: if isDocumentOwner();
+      
+      // Create: only if userId in new document matches authenticated user
+      allow create: if willBeDocumentOwner();
+      
+      // Update/Delete: only if user owns this document
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // POSTURE SESSIONS COLLECTION
+    // ============================================
+    
+    match /posture_sessions/{sessionId} {
+      // Read: only if user owns this document
+      allow read: if isDocumentOwner();
+      
+      // Create: only if userId in new document matches authenticated user
+      allow create: if willBeDocumentOwner();
+      
+      // Update/Delete: only if user owns this document
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // DRESSING SESSIONS COLLECTION
+    // ============================================
+    
+    match /dressing_sessions/{sessionId} {
+      // Read: only if user owns this document
+      allow read: if isDocumentOwner();
+      
+      // Create: only if userId in new document matches authenticated user
+      allow create: if willBeDocumentOwner();
+      
+      // Update/Delete: only if user owns this document
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // RESUME ANALYSIS COLLECTION
+    // ============================================
+    
+    match /resume_analysis/{analysisId} {
+      // Read: only if user owns this document
+      allow read: if isDocumentOwner();
+      
+      // Create: only if userId in new document matches authenticated user
+      allow create: if willBeDocumentOwner();
+      
+      // Update/Delete: only if user owns this document
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // LEGACY/ALTERNATIVE COLLECTION NAMES
+    // ============================================
+    
+    // Resume sessions (alternative naming)
+    match /resume_sessions/{sessionId} {
+      allow read: if isDocumentOwner();
+      allow create: if willBeDocumentOwner();
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // Mock interviews (alternative naming)
+    match /mock_interviews/{sessionId} {
+      allow read: if isDocumentOwner();
+      allow create: if willBeDocumentOwner();
+      allow update, delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // DEFAULT DENY ALL
+    // ============================================
+    // Any collection not explicitly listed above is denied by default
+    // This is a security best practice
   }
 }

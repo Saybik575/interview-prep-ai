@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,6 +13,7 @@ import {
   Col,
   Alert,
 } from "react-bootstrap";
+import { getAuth } from 'firebase/auth';
 
 const ResumeAnalysisPage = () => {
   const [jdText, setJdText] = useState("");
@@ -32,11 +33,27 @@ const ResumeAnalysisPage = () => {
 
   const fileInputRef = useRef();
   const navigate = useNavigate();
+  const auth = getAuth();
+  const [user, setUser] = useState(null);
 
-  // Replace with actual userId from auth context
-  const userId = "demoUser";
+  // Get actual userId from Firebase auth
+  const userId = user?.uid || null;
 
-  const fetchHistory = async () => {
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        navigate('/auth');
+      }
+    });
+    return () => unsubscribe();
+  }, [auth, navigate]);
+
+  const fetchHistory = useCallback(async () => {
+    if (!userId) return;
+    
     setIsHistoryLoading(true);
     try {
       const response = await axios.get(`/api/resume/history?userId=${userId}`);
@@ -47,11 +64,11 @@ const ResumeAnalysisPage = () => {
     } finally {
       setIsHistoryLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
-  fetchHistory();
-  }, [userId]);
+    fetchHistory();
+  }, [fetchHistory]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -426,7 +443,7 @@ const ResumeAnalysisPage = () => {
                   return (
                     <tr key={h.docId}>
                       <td>{dateStr}</td>
-                      <td>{clamp(h.score)}</td>
+                      <td>{clamp(h.score)}/100</td>
                       <td>{clamp(h.similarity_with_jd)}%</td>
                       <td>{clamp(h.ats_score)}%</td>
                       <td>

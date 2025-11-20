@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { FaFileAlt, FaMicrophone, FaUserCheck, FaTshirt } from 'react-icons/fa';
+import AnalyticsPanel from './AnalyticsPanel';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -132,17 +133,8 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      {/* Footer Card */}
-      <Row className="justify-content-center mt-4">
-        <Col xs={12}>
-          <Card className="shadow-lg border-0" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', borderRadius: '1rem' }}>
-            <Card.Body className="text-center py-3">
-              <div className="fw-bold text-white" style={{ fontSize: '1.25rem' }}>Interview Prep AI</div>
-              <div className="text-white-50" style={{ fontSize: '1rem' }}>© 2024 Interview Prep AI. All Rights Reserved.</div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      {/* Performance Analytics */}
+      {user && <AnalyticsPanel userId={user.uid} />}
     </Container>
   );
 };
