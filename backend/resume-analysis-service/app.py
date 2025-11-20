@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 import docx2txt
 from pdfminer.high_level import extract_text
 import json
-import language_tool_python
+import re
 from google.cloud import firestore
 
 app = Flask(__name__)
@@ -25,8 +25,40 @@ if os.path.exists('skills.json'):
     except Exception:
         pass
 
-tool = language_tool_python.LanguageTool('en-US')
 db = firestore.Client()
+
+def simple_grammar_check(text):
+    """Simple grammar checking without external dependencies"""
+    issues = []
+    
+    # Check for common issues
+    sentences = re.split(r'[.!?]+', text)
+    for i, sentence in enumerate(sentences[:10]):  # Check first 10 sentences
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+            
+        # Check if sentence starts with lowercase (except after colon)
+        if sentence and sentence[0].islower() and i > 0:
+            issues.append({
+                'message': 'Sentence should start with a capital letter',
+                'suggestions': [sentence.capitalize()],
+                'context': sentence[:100],
+                'offset': -1,
+                'length': 0
+            })
+        
+        # Check for double spaces
+        if '  ' in sentence:
+            issues.append({
+                'message': 'Multiple consecutive spaces found',
+                'suggestions': [sentence.replace('  ', ' ')],
+                'context': sentence[:100],
+                'offset': -1,
+                'length': 0
+            })
+    
+    return issues[:8]  # Return max 8 issues
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -139,28 +171,7 @@ def analyze_resume():
         missing_keywords = list(jd_keywords - resume_words)
         ats_score = (len(present_keywords) / len(jd_keywords) * 100) if jd_keywords else 0
 
-        matches = tool.check(text)
-        grammar_issues = []
-        max_issues = 8
-        for m in matches[:max_issues]:
-            try:
-                replacements = m.replacements if hasattr(m, 'replacements') else []
-                try:
-                    start = max(0, int(m.offset) - 40)
-                    err_len = int(getattr(m, 'errorLength', 0) or 0)
-                    end = int(m.offset) + err_len + 40
-                    snippet = text[start:end].replace('\n', ' ')
-                except Exception:
-                    snippet = (text[:200] + '...') if len(text) > 200 else text
-                grammar_issues.append({
-                    'message': getattr(m, 'message', str(m)),
-                    'suggestions': replacements[:3],
-                    'context': snippet,
-                    'offset': int(getattr(m, 'offset', -1)),
-                    'length': int(getattr(m, 'errorLength', 0) or 0)
-                })
-            except Exception:
-                grammar_issues.append({'message': str(m), 'suggestions': [], 'context': ''})
+        grammar_issues = simple_grammar_check(text)
 
         text_preview = text[:12000] + ("..." if len(text) > 12000 else "")
 
