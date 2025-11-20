@@ -164,48 +164,117 @@ Repeat for all 4 Python services.
 
 ## 🌐 Step 3: Deploy Frontend to Vercel (Recommended)
 
-### 3.1 Prepare Frontend for Deployment
+### 3.1 Files Already Configured ✅
 
-Update `frontend/src/firebase.js` or environment configuration to use production backend URL:
+Your frontend is ready to deploy with these pre-configured files:
 
-```javascript
-// Instead of localhost:5000
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://interview-prep-backend.onrender.com';
+- ✅ `frontend/vercel.json` - Handles SPA routing and API proxy
+- ✅ `frontend/.env.example` - Template for environment variables
+- ✅ All API calls use relative paths (`/api/...`) - automatically proxied
+
+### 3.2 Get Your Firebase Configuration
+
+1. Go to Firebase Console: https://console.firebase.google.com
+2. Select your project: `interview-prep-ai-1fdc7`
+3. Click ⚙️ Settings → Project Settings
+4. Scroll to "Your apps" → Select Web App
+5. Copy the configuration values
+
+### 3.3 Deploy to Vercel (Step-by-Step)
+
+#### **Option A: Using Vercel Dashboard (Easiest)**
+
+1. **Sign Up**: Go to https://vercel.com → Sign up with GitHub
+2. **New Project**: Click "Add New..." → "Project"
+3. **Import Repository**: 
+   - Click "Import Git Repository"
+   - Select `interview-prep-ai` from your repositories
+   - Click "Import"
+
+4. **Configure Build Settings**:
+   - **Framework Preset**: Create React App (auto-detected)
+   - **Root Directory**: Click "Edit" → Enter `frontend`
+   - **Build Command**: `npm run build` (auto-filled)
+   - **Output Directory**: `build` (auto-filled)
+   - **Install Command**: `npm install` (auto-filled)
+
+5. **Add Environment Variables**:
+   Click "Environment Variables" and add each one:
+   
+   ```
+   Name: REACT_APP_FIREBASE_API_KEY
+   Value: [paste from Firebase Console]
+   
+   Name: REACT_APP_FIREBASE_AUTH_DOMAIN
+   Value: interview-prep-ai-1fdc7.firebaseapp.com
+   
+   Name: REACT_APP_FIREBASE_PROJECT_ID
+   Value: interview-prep-ai-1fdc7
+   
+   Name: REACT_APP_FIREBASE_STORAGE_BUCKET
+   Value: interview-prep-ai-1fdc7.firebasestorage.app
+   
+   Name: REACT_APP_FIREBASE_MESSAGING_SENDER_ID
+   Value: [paste from Firebase Console]
+   
+   Name: REACT_APP_FIREBASE_APP_ID
+   Value: [paste from Firebase Console]
+   
+   Name: REACT_APP_FIREBASE_MEASUREMENT_ID
+   Value: [paste from Firebase Console]
+   ```
+
+6. **Deploy**: Click "Deploy" → Wait 2-3 minutes
+7. **Success**: Your app will be live at `https://your-project.vercel.app`
+
+#### **Option B: Using Vercel CLI (Advanced)**
+
+```bash
+# Install Vercel CLI globally
+npm install -g vercel
+
+# Navigate to project root
+cd d:\Satvik\IPD\interview-prep-ai
+
+# Login to Vercel
+vercel login
+
+# Deploy
+vercel --prod
+
+# Follow prompts:
+# - Set up and deploy? Y
+# - Which scope? [your account]
+# - Link to existing project? N
+# - Project name? interview-prep-ai
+# - Directory? frontend
+# - Override build settings? N
 ```
 
-### 3.2 Create `.env.production` in frontend folder
+Then add environment variables via dashboard.
 
-```env
-REACT_APP_BACKEND_URL=https://interview-prep-backend.onrender.com
-REACT_APP_FIREBASE_API_KEY=your-firebase-api-key
-REACT_APP_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=your-project-id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-REACT_APP_FIREBASE_APP_ID=your-app-id
-```
+### 3.4 Alternative: Deploy Frontend to Netlify
 
-### 3.3 Deploy to Vercel
+1. Go to https://netlify.com → Sign up with GitHub
+2. Click "Add new site" → "Import an existing project"
+3. **Connect to Git**: GitHub → Select `interview-prep-ai`
+4. **Build Settings**:
+   - **Base directory**: `frontend`
+   - **Build command**: `npm run build`
+   - **Publish directory**: `frontend/build`
+5. **Environment Variables**: Site settings → Environment variables → Add each Firebase config variable
+6. Click "Deploy site"
 
-1. Go to https://vercel.com
-2. Click "New Project"
-3. Import your GitHub repository
-4. **Framework Preset**: Create React App
-5. **Root Directory**: `frontend`
-6. **Build Command**: `npm run build`
-7. **Output Directory**: `build`
-8. Add environment variables from `.env.production`
-9. Click "Deploy"
-
-### 3.4 Alternative: Deploy Frontend to Render
+### 3.5 Alternative: Deploy Frontend to Render
 
 1. Dashboard → "New" → "Static Site"
 2. Connect repository: `interview-prep-ai`
 3. **Name**: `interview-prep-frontend`
-4. **Build Command**: `cd frontend && npm install && npm run build`
-5. **Publish Directory**: `frontend/build`
-6. Add environment variables
-7. Click "Create Static Site"
+4. **Root Directory**: `frontend`
+5. **Build Command**: `npm install && npm run build`
+6. **Publish Directory**: `build`
+7. Add environment variables (same Firebase config as above)
+8. Click "Create Static Site"
 
 ---
 
