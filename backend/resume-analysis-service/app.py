@@ -25,7 +25,14 @@ if os.path.exists('skills.json'):
     except Exception:
         pass
 
-db = firestore.Client()
+# Initialize Firestore (optional - for history feature)
+db = None
+try:
+    db = firestore.Client()
+    print("✅ Firestore connected successfully")
+except Exception as e:
+    print(f"⚠️ Firestore not configured (history disabled): {e}")
+    db = None
 
 def simple_grammar_check(text):
     """Simple grammar checking without external dependencies"""
@@ -67,6 +74,9 @@ def allowed_file(filename):
 
 @app.route('/resume/history', methods=['GET'])
 def get_resume_history():
+    if not db:
+        return jsonify({'error': 'History feature disabled (Firestore not configured)'}), 503
+    
     user_id = request.args.get('userId', 'demoUser')
     docs = db.collection('resume_analysis').where('userId', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(20).stream()
     history = []
@@ -84,6 +94,9 @@ def get_resume_history():
 
 @app.route('/resume/history/delete', methods=['POST'])
 def delete_resume_history():
+    if not db:
+        return jsonify({'error': 'History feature disabled (Firestore not configured)'}), 503
+    
     try:
         data = request.json
         doc_id = data.get('docId')
@@ -185,19 +198,21 @@ def analyze_resume():
             'text_preview': text_preview
         }
 
-        try:
-            doc_ref = db.collection('resume_analysis').document()
-            doc_ref.set({
-                'userId': user_id,
-                'timestamp': firestore.SERVER_TIMESTAMP,
-                'score': score,
-                'similarity_with_jd': similarity_with_jd,
-                'ats_score': round(ats_score, 2),
-                'missing_keywords': missing_keywords,
-                'skills_found': found_skills
-            })
-        except Exception:
-            pass
+        # Save to Firestore if configured
+        if db:
+            try:
+                doc_ref = db.collection('resume_analysis').document()
+                doc_ref.set({
+                    'userId': user_id,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                    'score': score,
+                    'similarity_with_jd': similarity_with_jd,
+                    'ats_score': round(ats_score, 2),
+                    'missing_keywords': missing_keywords,
+                    'skills_found': found_skills
+                })
+            except Exception as e:
+                print(f"Failed to save to Firestore: {e}")
 
         try:
             os.remove(filepath)
