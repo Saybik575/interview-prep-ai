@@ -402,7 +402,7 @@ app.get('/api/resume/history', async (req, res) => {
     
     const history = [];
     snapshot.forEach(doc => {
-      const data = doc.to_dict();
+      const data = doc.data();
       history.push({
         docId: doc.id,
         analysisId: doc.id,
