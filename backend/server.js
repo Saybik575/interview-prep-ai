@@ -102,6 +102,7 @@ app.use('/api/posture', async (req, res, next) => {
 
     // Build target URL. All requests to this middleware should go to the single endpoint.
     const targetUrl = `${POSTURE_SERVICE_URL.replace(/\/$/, '')}/api/posture`;
+    console.log(`Posture proxy: ${req.method} ${req.path} -> ${targetUrl}`);
 
     // Clone headers but drop hop-by-hop ones and accept-encoding to avoid decompression issues
     const headers = { ...req.headers };
