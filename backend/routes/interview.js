@@ -2,7 +2,9 @@ const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 
-const MOCK_INTERVIEW_FLASK_URL = process.env.MOCK_INTERVIEW_FLASK_URL || 'http://localhost:5003';
+const MOCK_INTERVIEW_FLASK_URL = process.env.MOCK_INTERVIEW_SERVICE_URL 
+  ? `https://${process.env.MOCK_INTERVIEW_SERVICE_URL}` 
+  : 'http://localhost:5004';
 const router = express.Router();
 
 function extractAxiosErrorInfo(err) {

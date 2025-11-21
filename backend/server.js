@@ -86,7 +86,9 @@ if (!admin.apps.length) {
 }
 
 // Posture API proxy route - native implementation (no http-proxy-middleware)
-const POSTURE_SERVICE_URL = process.env.POSTURE_SERVICE_URL || 'http://localhost:5001';
+const POSTURE_SERVICE_URL = process.env.POSTURE_SERVICE_URL 
+  ? `https://${process.env.POSTURE_SERVICE_URL}` 
+  : 'http://localhost:5001';
 app.use('/api/posture', async (req, res, next) => {
   try {
     // Keep local handlers (save-session, history GET, history DELETE) out of proxy
@@ -236,7 +238,9 @@ app.post('/api/proxy-dress-analysis', uploadMemory.single('file'), async (req, r
     });
 
     // Forward to Flask analyze-dress endpoint
-    const flaskUrl = process.env.DRESS_ANALYZE_URL || 'http://localhost:5001/api/analyze-dress';
+    const flaskUrl = process.env.DRESSING_SERVICE_URL 
+      ? `https://${process.env.DRESSING_SERVICE_URL}/api/analyze-dress` 
+      : 'http://localhost:5002/api/analyze-dress';
     // Increase timeout to 120s to match backend LLM request timeout and avoid
     // client-side cancellations for longer model generations.
     const response = await axios.post(flaskUrl, form, { headers: form.getHeaders(), timeout: 120_000 });
