@@ -485,7 +485,7 @@ def evaluate():
 # Entrypoint
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mock Interview Flask Service (categorized roles)")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 5003)), help="Port to run the service on.")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 5004)), help="Port to run the service on.")
     args = parser.parse_args()
     logger.info("Starting mock interview service on port %s", args.port)
     app.run(host="0.0.0.0", port=args.port, debug=True)

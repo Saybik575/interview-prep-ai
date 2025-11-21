@@ -62,6 +62,9 @@ fi
 if ! check_port 5003; then
     exit 1
 fi
+if ! check_port 5004; then
+    exit 1
+fi
 if ! check_port 8000; then
     exit 1
 fi
@@ -83,38 +86,31 @@ if ! check_port 11434; then
         OLLAMA_ALREADY_RUNNING=1
     fi
 fi
-echo "✅ Ports 3000, 5000, 5001, 5002, 5003, 8000, 8001 are available (11434 reused if already running)"
+echo "✅ Ports 3000, 5000, 5001, 5002, 5003, 5004, 8000, 8001 are available (11434 reused if already running)"
 echo ""
 
-# Start Flask dressing-analysis-service
-echo "👗 Starting dressing analysis service (Flask)..."
+# Start Flask dressing-analysis-service (Gemini)
+echo "👗 Starting dressing analysis service (Gemini Vision API)..."
 cd backend/dressing-analysis-service
-python yolo_dressing_service.py &
+python gemini_dressing_service.py &
 DRESS_PID=$!
 cd ../..
 
 # Start backend (Express proxy)
 echo "🔧 Starting backend server (Express proxy)..."
 export DRESS_ANALYZE_URL="http://localhost:5002/api/analyze-dress"
-export MOCK_INTERVIEW_URL="http://localhost:5003" # <-- New setting for Express to proxy to
+export MOCK_INTERVIEW_URL="http://localhost:5004" # <-- New setting for Express to proxy to
 cd backend
 npm run dev &
 BACKEND_PID=$!
 cd ..
 
 # Start Flask resume-analysis-service
-echo "🧠 Starting Flask resume analysis service (8000)..."
+echo "🧠 Starting Flask resume analysis service (5003)..."
 echo "   (Note: First startup may take 1-2 minutes due to ML model initialization)"
 cd backend/resume-analysis-service
 python app.py &
 FLASK_PID=$!
-cd ../..
-
-# Start Flask resume-analysis-service history API
-echo "📚 Starting Flask resume history service (8001)..."
-cd backend/resume-analysis-service
-python history_api.py &
-HISTORY_PID=$!
 cd ../..
 
 # Start Flask posture-analysis-service
@@ -124,11 +120,11 @@ python yolo_posture_service.py &
 POSTURE_PID=$!
 cd ../..
 
-# Start Flask mock-interview-service on dedicated port 5003
-echo "🤖 Starting Flask mock interview service (5003)..."
+# Start Flask mock-interview-service on dedicated port 5004
+echo "🤖 Starting Flask mock interview service (5004)..."
 cd backend/mock-interview-service
 # The Flask run command must accept a port argument or use an environment variable
-python app.py --port 5003 & 
+python app.py --port 5004 & 
 MOCK_PID=$!
 cd ../..
 
@@ -148,9 +144,8 @@ echo "🎉 All services are starting up!"
 echo ""
 echo "📱 Frontend: http://localhost:3000"
 echo "🔧 Backend (Express Proxy): http://localhost:5000"
-echo "🤖 Mock Interview Service: http://localhost:5003"
-echo "🧠 Resume Analysis Service: http://localhost:8000"
-echo "📚 Resume History Service: http://localhost:8001"
+echo "🧠 Resume Analysis Service: http://localhost:5003"
+echo "🤖 Mock Interview Service: http://localhost:5004"
 echo "🧘 Posture Analysis Service: http://localhost:5001"
 echo "👗 Dressing Analysis Service: http://localhost:5002"
 echo "---"
@@ -162,10 +157,9 @@ cleanup() {
     echo ""
     echo "🛑 Stopping services..."
     kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/devs/null
+    kill $FRONTEND_PID 2>/dev/null
     kill $FLASK_PID 2>/dev/null
     kill $MOCK_PID 2>/dev/null
-    kill $HISTORY_PID 2>/dev/null
     kill $POSTURE_PID 2>/dev/null
     kill $DRESS_PID 2>/dev/null
     echo "✅ Services stopped"

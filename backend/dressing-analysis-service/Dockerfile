@@ -1,12 +1,5 @@
-# Dressing Analysis Service Dockerfile
+# Dressing Analysis Service Dockerfile (Gemini Vision API)
 FROM python:3.11-slim
-
-# Install system dependencies for OpenCV
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -15,11 +8,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code and model
-COPY . .
+# Copy application code
+COPY gemini_dressing_service.py .
 
 # Expose port
 EXPOSE 5002
 
+# Environment variable for API key (set in Render dashboard)
+ENV GEMINI_API_KEY=""
+
 # Run the application
-CMD ["python", "yolo_dressing_service.py"]
+CMD ["python", "gemini_dressing_service.py"]

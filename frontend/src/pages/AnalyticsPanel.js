@@ -442,7 +442,6 @@ const AnalyticsPanel = ({ userId }) => {
                       label={{ value: 'Score (%)', angle: -90, position: 'insideLeft' }}
                       domain={[0, 100]}
                     />
-                    <Tooltip />
                     <Legend />
                     <Bar 
                       dataKey="score" 

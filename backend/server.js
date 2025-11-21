@@ -86,8 +86,12 @@ if (!admin.apps.length) {
 }
 
 // Posture API proxy route - native implementation (no http-proxy-middleware)
+// If POSTURE_SERVICE_URL env var is set, use it as-is (should be full URL)
+// Otherwise default to localhost. For Render deployment, set env var to just the service name (e.g., "posture-service-xyz")
 const POSTURE_SERVICE_URL = process.env.POSTURE_SERVICE_URL 
-  ? `https://${process.env.POSTURE_SERVICE_URL}.onrender.com` 
+  ? (process.env.POSTURE_SERVICE_URL.startsWith('http') 
+      ? process.env.POSTURE_SERVICE_URL 
+      : `https://${process.env.POSTURE_SERVICE_URL}.onrender.com`)
   : 'http://localhost:5001';
 app.use('/api/posture', async (req, res, next) => {
   try {
@@ -263,16 +267,19 @@ app.post('/api/proxy-dress-analysis', uploadMemory.single('file'), async (req, r
     // Build multipart form with the buffer
     const FormData = require('form-data');
     const form = new FormData();
-    // Forward as 'file' so Flask can access request.files.get('file') or request.files.get('outfitImage')
-    form.append('file', req.file.buffer, {
+    // Forward as 'image' for Gemini service compatibility
+    form.append('image', req.file.buffer, {
       filename: req.file.originalname || 'upload.jpg',
       contentType: req.file.mimetype || 'image/jpeg'
     });
 
     // Forward to Flask analyze-dress endpoint
+    // If env var starts with http, use as-is; otherwise assume it's a Render service name
     const flaskUrl = process.env.DRESSING_SERVICE_URL 
-      ? `https://${process.env.DRESSING_SERVICE_URL}.onrender.com/api/analyze-dress` 
-      : 'http://localhost:5002/api/analyze-dress';
+      ? (process.env.DRESSING_SERVICE_URL.startsWith('http') 
+          ? `${process.env.DRESSING_SERVICE_URL}/analyze-dress`
+          : `https://${process.env.DRESSING_SERVICE_URL}.onrender.com/analyze-dress`)
+      : 'http://localhost:5002/analyze-dress';
     // Increase timeout to 120s to match backend LLM request timeout and avoid
     // client-side cancellations for longer model generations.
     const response = await axios.post(flaskUrl, form, { headers: form.getHeaders(), timeout: 120_000 });
@@ -505,8 +512,11 @@ app.post('/api/resume', upload.single('file'), async (req, res) => {
     if (req.body.userId) {
       form.append('userId', req.body.userId);
     }
+    // If env var starts with http, use as-is; otherwise assume it's a Render service name
     const resumeServiceUrl = process.env.RESUME_SERVICE_URL 
-      ? `https://${process.env.RESUME_SERVICE_URL}.onrender.com/analyze-resume` 
+      ? (process.env.RESUME_SERVICE_URL.startsWith('http') 
+          ? `${process.env.RESUME_SERVICE_URL}/analyze-resume`
+          : `https://${process.env.RESUME_SERVICE_URL}.onrender.com/analyze-resume`)
       : 'http://localhost:5003/analyze-resume';
     const response = await axios.post(resumeServiceUrl, form, {
       headers: form.getHeaders(),

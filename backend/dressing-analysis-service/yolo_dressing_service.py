@@ -3,7 +3,6 @@ import io
 import logging
 import json
 import re
-import base64
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
 
@@ -12,15 +11,6 @@ from flask import Flask, request, jsonify
 # Required non-standard libraries
 from PIL import Image
 import requests
-
-# Google Gemini API
-try:
-    from google import genai
-    from google.genai import types
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
-    genai = None
 
 # Try ultralytics YOLO import (if available)
 try:
@@ -40,22 +30,7 @@ except Exception:
 # --------------------- Configuration ---------------------
 MODEL_PATH = os.environ.get("DRESS_YOLO_MODEL") or os.path.join(os.path.dirname(__file__), "yolo11n.pt")
 
-# Gemini Configuration (replaces Ollama for cloud deployment)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-2.0-flash-exp")
-
-# Initialize Gemini client if available
-gemini_client = None
-if GEMINI_AVAILABLE and GEMINI_API_KEY:
-    try:
-        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logger = logging.getLogger(__name__)
-        logger.info(f"✅ Gemini API initialized with model: {GEMINI_MODEL_NAME}")
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to initialize Gemini: {e}")
-
-# Fallback: Ollama configuration (for local development)
+# Ollama configuration (for local development)
 _RAW_OLLAMA_URL = os.environ.get("OLLAMA_URL") or os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama2:7b")
 
@@ -196,7 +171,7 @@ def heuristic_score(detected_names):
     if not detected_names or detected_names == set():
         # Return a message asking for manual assessment or use placeholder
         score = 50
-        feedback = "Automated clothing detection unavailable. Default neutral score applied. For professional interviews, ensure formal attire: dress shirt, blazer, tie (for men) or professional blouse/blazer (for women)."
+        feedback = "For professional interviews, ensure formal attire: dress shirt, blazer, tie (for men) or professional blouse/blazer (for women)."
         return score, feedback
 
     score = DEFAULT_BASE_SCORE
@@ -240,71 +215,6 @@ def heuristic_score(detected_names):
     feedback = "Detected items: " + ", ".join(sorted(detected_names)) + ". " + (" ".join(reasons) if reasons else "")
 
     return score, feedback
-
-
-def call_llm_for_scoring(detected_items, user_image_context: str, image_bytes=None):
-    """
-    Call Gemini Vision API (preferred) or Ollama (fallback) for scoring.
-    Returns dict with score, feedback, success flag.
-    """
-    detected_list = ", ".join(sorted(detected_items)) if detected_items else "none"
-
-    # Build prompt
-    prompt_text = (
-        f"Analyze this outfit for a professional job interview.\n"
-        f"Detected clothing items: {detected_list}\n"
-        f"Additional context: {user_image_context}\n\n"
-        "Rate this outfit's professionalism for a corporate job interview on a scale of 0-100.\n"
-        "IMPORTANT RULES:\n"
-        "- Formal attire (suit, blazer, tie, dress shirt, professional dress): 70-100 points\n"
-        "- Business casual (collared shirt, dress pants): 50-70 points\n"
-        "- Casual attire (t-shirt, shorts, hat, sandals, hoodie): 0-30 points\n\n"
-        "Provide your response in this EXACT format:\n"
-        "SCORE: [number]\n"
-        "[Your detailed feedback explaining the score]"
-    )
-
-    # Try Gemini Vision API first (if available and image provided)
-    if gemini_client and image_bytes:
-        try:
-            logger.info(f"Calling Gemini Vision API with model: {GEMINI_MODEL_NAME}")
-            
-            # Convert image bytes to base64
-            image_b64 = base64.b64encode(image_bytes).decode('utf-8')
-            
-            response = gemini_client.models.generate_content(
-                model=GEMINI_MODEL_NAME,
-                contents=[
-                    types.Part.from_text(text=prompt_text),
-                    types.Part.from_bytes(
-                        data=image_bytes,
-                        mime_type="image/jpeg"
-                    )
-                ],
-                config=types.GenerateContentConfig(
-                    temperature=0.0,
-                    max_output_tokens=300
-                )
-            )
-            
-            if response and response.text:
-                text = response.text.strip()
-                logger.info(f"Gemini response received: {text[:200]}...")
-                
-                # Parse score from response
-                score_match = re.search(r'SCORE:\s*(\d+)', text, re.IGNORECASE)
-                if score_match:
-                    score = int(score_match.group(1))
-                    score = max(0, min(100, score))  # Clamp to 0-100
-                    # Extract feedback (everything after SCORE: line)
-                    feedback = re.sub(r'SCORE:\s*\d+\s*', '', text, flags=re.IGNORECASE).strip()
-                    return {"success": True, "score": score, "feedback": feedback, "raw_response": text, "source": "gemini"}
-                
-        except Exception as exc:
-            logger.warning(f"Gemini Vision API failed: {exc}")
-
-    # Fallback to Ollama for local development
-    return call_ollama_for_scoring(detected_items, user_image_context)
 
 
 def call_ollama_for_scoring(detected_items, user_image_context: str):
@@ -415,12 +325,11 @@ def analyze_image_bytes(image_bytes, filename="upload.jpg"):
         except Exception:
             logger.exception("Error during YOLO inference; continuing with empty detections.")
     
-    # 2) LLM Scoring - Use Gemini Vision (preferred) or Ollama (fallback)
-    llm_response = call_llm_for_scoring(detected_names, user_image_context=user_image_context, image_bytes=image_bytes)
+    # 2) LLM Scoring - Use Ollama
+    llm_response = call_ollama_for_scoring(detected_names, user_image_context=user_image_context)
     score = llm_response.get("score")
     feedback = llm_response.get("feedback")
     used_llm = llm_response.get("success", False)
-    llm_source = llm_response.get("source", "unknown")
     
     # 3) Post-LLM: Implement the CRITICAL CASUAL-ATTIRE GUARDRAIL
     lowered_detected = {n.lower() for n in detected_names}

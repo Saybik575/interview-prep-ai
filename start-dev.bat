@@ -8,32 +8,28 @@ echo.
 
 REM --- Service Startup ---
 
-REM Start Flask dressing-analysis-service (Port 5002)
-echo 👗 Starting dressing analysis service (Port 5002)...
-start "Dressing Analysis Service" cmd /k "cd backend\dressing-analysis-service && set FLASK_RUN_PORT=5002 && python yolo_dressing_service.py"
+REM Start Flask dressing-analysis-service (Port 5002) - Gemini
+echo 👗 Starting dressing analysis service with Gemini Vision API (Port 5002)...
+start "Dressing Analysis Service" cmd /k "cd backend\dressing-analysis-service && set FLASK_RUN_PORT=5002 && python gemini_dressing_service.py"
 
 REM Start Flask posture-analysis-service (Port 5001)
 echo 🧘 Starting posture analysis service (Port 5001)...
 start "Posture Analysis Service" cmd /k "cd backend\posture-analysis-service && set FLASK_RUN_PORT=5001 && python yolo_posture_service.py"
 
-REM Start Flask mock interview service (Port 5003)
-echo 🤖 Starting mock interview service (Port 5003)...
-start "Mock Interview Service" cmd /k "cd backend\mock-interview-service && python app.py --port 5003"
+REM Start Flask mock interview service (Port 5004)
+echo 🤖 Starting mock interview service (Port 5004)...
+start "Mock Interview Service" cmd /k "cd backend\mock-interview-service && python app.py --port 5004"
 
-REM Start Flask resume analysis service (Port 8000)
-echo 🧠 Starting resume analysis service (Port 8000)...
-start "Resume Analysis Service" cmd /k "cd backend\resume-analysis-service && set FLASK_RUN_PORT=8000 && python app.py"
-
-REM Start Flask resume history service (Port 8001)
-echo 📚 Starting resume history service (Port 8001)...  
-start "Resume History Service" cmd /k "cd backend\resume-analysis-service && set FLASK_RUN_PORT=8001 && python history_api.py"
+REM Start Flask resume analysis service (Port 5003)
+echo 🧠 Starting resume analysis service (Port 5003)...
+start "Resume Analysis Service" cmd /k "cd backend\resume-analysis-service && set PORT=5003 && python app.py"
 
 REM --- Express Proxy and Frontend ---
 
 REM Start backend Express server (Port 5000)
 echo 🔧 Starting backend Express server (Port 5000)...
 REM Express needs to know where the mock service runs to proxy requests
-set MOCK_INTERVIEW_URL=http://localhost:5003 
+set MOCK_INTERVIEW_URL=http://localhost:5004 
 start "Backend Express Server" cmd /k "cd backend && npm run dev"
 
 REM Wait for services to start
@@ -50,11 +46,10 @@ echo 🎉 All services are starting up!
 echo.
 echo 📱 Frontend: http://localhost:3000
 echo 🔧 Backend (Express Proxy): http://localhost:5000
-echo 🤖 Mock Interview: http://localhost:5003  <-- CORRECTED PORT
+echo 🧠 Resume Analysis: http://localhost:5003
+echo 🤖 Mock Interview: http://localhost:5004
 echo 🧘 Posture Analysis: http://localhost:5001
 echo 👗 Dressing Analysis: http://localhost:5002
-echo 🧠 Resume Analysis: http://localhost:8000
-echo 📚 Resume History: http://localhost:8001
 echo 💡 Remember to manually start the Ollama server on http://localhost:11434
 echo.
 pause

@@ -56,7 +56,7 @@ services:
       - key: FLASK_ENV
         value: production
 
-  # 3. Dressing Analysis Service (Python + YOLO + Gemini Vision)
+  # 3. Dressing Analysis Service (Python + Gemini Vision API)
   - type: web
     name: dressing-analysis-service
     env: docker
@@ -71,8 +71,6 @@ services:
         value: production
       - key: GEMINI_API_KEY
         sync: false
-      - key: GEMINI_MODEL_NAME
-        value: gemini-2.0-flash-exp
 
   # 4. Resume Analysis Service (Python + NLP)
   - type: web
