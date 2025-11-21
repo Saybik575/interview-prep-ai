@@ -9,6 +9,7 @@ from pdfminer.high_level import extract_text
 import json
 import re
 from google.cloud import firestore
+from google.oauth2 import service_account
 
 app = Flask(__name__)
 CORS(app)
@@ -25,13 +26,35 @@ if os.path.exists('skills.json'):
     except Exception:
         pass
 
-# Initialize Firestore (optional - for history feature)
+# Initialize Firestore with service account credentials from environment
 db = None
 try:
-    db = firestore.Client()
-    print("✅ Firestore connected successfully")
+    # Check if credentials are provided via environment variables
+    project_id = os.environ.get("FIREBASE_PROJECT_ID")
+    private_key = os.environ.get("FIREBASE_PRIVATE_KEY")
+    client_email = os.environ.get("FIREBASE_CLIENT_EMAIL")
+    
+    if project_id and private_key and client_email:
+        # Create credentials from environment variables
+        credentials_dict = {
+            "type": "service_account",
+            "project_id": project_id,
+            "private_key": private_key.replace('\\n', '\n'),
+            "client_email": client_email,
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+        db = firestore.Client(project=project_id, credentials=credentials)
+        print(f"✅ Firestore connected successfully (project: {project_id})")
+    else:
+        print("⚠️ Missing Firebase credentials in environment variables")
+        print(f"   PROJECT_ID: {'✓' if project_id else '✗'}")
+        print(f"   PRIVATE_KEY: {'✓' if private_key else '✗'}")
+        print(f"   CLIENT_EMAIL: {'✓' if client_email else '✗'}")
+        db = None
 except Exception as e:
-    print(f"⚠️ Firestore not configured (history disabled): {e}")
+    print(f"⚠️ Firestore initialization failed: {e}")
     db = None
 
 def simple_grammar_check(text):

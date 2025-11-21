@@ -103,17 +103,20 @@ app.use('/api/posture', async (req, res, next) => {
     // Build target URL. All requests to this middleware should go to the single endpoint.
     const targetUrl = `${POSTURE_SERVICE_URL.replace(/\/$/, '')}/api/posture`;
 
-    // Clone headers but drop hop-by-hop ones
+    // Clone headers but drop hop-by-hop ones and accept-encoding to avoid decompression issues
     const headers = { ...req.headers };
     delete headers['host'];
     delete headers['connection'];
     delete headers['content-length'];
+    // Keep accept-encoding removed to force uncompressed response
     delete headers['accept-encoding'];
 
     const method = req.method.toUpperCase();
     const fetchOptions = {
       method,
-      headers
+      headers,
+      // Add timeout to prevent hanging
+      signal: AbortSignal.timeout(120000) // 120 second timeout
     };
 
     // Because express.json() already consumed body, use req.body for JSON
@@ -142,10 +145,22 @@ app.use('/api/posture', async (req, res, next) => {
 
     const response = await fetch(targetUrl, fetchOptions);
 
-    // Forward status & headers (filter unsafe)
+    // Check if response was successful
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`Posture service returned ${response.status}:`, errorText);
+      return res.status(response.status).json({ 
+        error: 'Posture service error', 
+        message: errorText || `Service returned ${response.status}` 
+      });
+    }
+
+    // Forward status & headers (filter unsafe and encoding-related ones)
     res.status(response.status);
     for (const [k, v] of response.headers) {
-      if (['transfer-encoding', 'content-length'].includes(k.toLowerCase())) continue;
+      const lowerKey = k.toLowerCase();
+      // Skip transfer-encoding, content-encoding, content-length as we'll set them ourselves
+      if (['transfer-encoding', 'content-encoding', 'content-length'].includes(lowerKey)) continue;
       res.setHeader(k, v);
     }
 
@@ -155,17 +170,29 @@ app.use('/api/posture', async (req, res, next) => {
       const data = await response.json().catch(() => null);
       return res.json(data);
     }
+    
+    // For non-JSON, get raw buffer
     const arrayBuf = await response.arrayBuffer();
     const buf = Buffer.from(arrayBuf);
     res.setHeader('content-length', buf.length);
     return res.end(buf);
   } catch (err) {
-    console.error('Posture proxy error:', err.message, err.code);
+    console.error('Posture proxy error:', err.message, err.code, err.name);
     if (!res.headersSent) {
-      const statusCode = err.code === 'ECONNREFUSED' ? 503 : 502;
+      const statusCode = err.code === 'ECONNREFUSED' ? 503 : (err.name === 'AbortError' ? 504 : 502);
+      let message = err.message;
+      
+      if (err.code === 'ECONNREFUSED') {
+        message = 'Posture service is starting up. Please try again in 30 seconds.';
+      } else if (err.name === 'AbortError') {
+        message = 'Posture service timeout. The service may be overloaded or experiencing issues.';
+      } else if (err.message && err.message.includes('fetch')) {
+        message = 'Failed to connect to posture service. Please try again.';
+      }
+      
       res.status(statusCode).json({ 
         error: err.code === 'ECONNREFUSED' ? 'Posture service starting' : 'Bad gateway', 
-        message: err.code === 'ECONNREFUSED' ? 'Service is starting up. Please try again in 30 seconds.' : err.message 
+        message 
       });
     }
   }

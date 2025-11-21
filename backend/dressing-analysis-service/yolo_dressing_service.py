@@ -161,20 +161,40 @@ def extract_detected_clothing(results, model=None):
 
 def heuristic_score(detected_names):
     """
-    Fallback scorer. Enhanced to assume shirt/trousers if tie/blazer detected 
-    to provide a reasonable baseline for formal wear when YOLO fails.
+    Fallback scorer with improved casual vs formal detection.
+    Now includes penalties for casual items and better scoring logic.
     """
     score = DEFAULT_BASE_SCORE
     reasons = []
     lowered = {n.lower() for n in detected_names}
+    
+    # Define casual items that should lower the score
+    CASUAL_ITEMS = {'hat', 'straw hat', 'shorts', 'casual'}
+    FORMAL_ITEMS = {'tie', 'blazer', 'dress', 'suit'}
+    
+    # Check if no items were detected - likely means YOLO failed
+    if not detected_names:
+        # When YOLO fails, default to a neutral-low score
+        score = 40
+        feedback = "No clothing items detected by AI model. Score based on default assessment. For accurate results, ensure good lighting and clear view of upper body."
+        return score, feedback
 
-    # 1. Base Score based on detection
+    # 1. Penalize casual items heavily
+    casual_penalty = 0
+    for item in CASUAL_ITEMS:
+        if item in lowered:
+            casual_penalty += 30
+            reasons.append(f"-30 for casual item: {item}")
+    
+    score -= casual_penalty
+    
+    # 2. Reward formal items
     for item, weight in HEURISTIC_WEIGHTS.items():
         if item in lowered:
             score += weight
             reasons.append(f"+{weight} for detected {item}")
 
-    # 2. Heuristic Enhancement (Safety Net for Formal Wear)
+    # 3. Heuristic Enhancement (Safety Net for Formal Wear)
     # If a formal piece (tie or blazer/dress) is detected, grant the assumed
     # score for the complementary pieces (shirt/trousers) if they were missed.
     if 'tie' in lowered or 'blazer' in lowered or 'dress' in lowered:
@@ -185,17 +205,14 @@ def heuristic_score(detected_names):
             score += HEURISTIC_WEIGHTS['trousers']
             reasons.append(f"+{HEURISTIC_WEIGHTS['trousers']} (Assumed bottom wear with formal piece)")
 
-    # 3. Penalty for incomplete formal look (only applies after assumption)
+    # 4. Penalty for incomplete formal look (only applies after assumption)
     if 'shirt' in lowered and not any(x in lowered for x in ('tie', 'blazer', 'dress')):
         score -= 5
         reasons.append("-5 shirt without tie/blazer/dress (too casual for interview)")
 
     score = max(0, min(MAX_SCORE, int(score)))
 
-    if not detected_names and score == DEFAULT_BASE_SCORE:
-        feedback = "No critical clothing items detected — default score applied."
-    else:
-        feedback = "Detected items: " + ", ".join(sorted(detected_names)) + ". " + (" ".join(reasons) if reasons else "")
+    feedback = "Detected items: " + ", ".join(sorted(detected_names)) + ". " + (" ".join(reasons) if reasons else "")
 
     return score, feedback
 
@@ -314,17 +331,36 @@ def analyze_image_bytes(image_bytes, filename="upload.jpg"):
     feedback = llm_response.get("feedback")
     used_llm = llm_response.get("success", False)
     
-    # 3) Post-LLM: Implement the CRITICAL CASUAL-ATTIRE GUARDRAL
+    # 3) Post-LLM: Implement the CRITICAL CASUAL-ATTIRE GUARDRAIL
     lowered_detected = {n.lower() for n in detected_names}
     
-    # Check for keywords that should result in a low score (only if LLM succeeded)
-    casual_keywords_for_guard = {"hat", "shorts", "straw hat", "casual short sleeve shirt"} 
+    # Expanded check for casual items that should result in a low score
+    casual_keywords_for_guard = {
+        "hat", "shorts", "straw hat", "casual short sleeve shirt",
+        "t-shirt", "tshirt", "tank top", "sandals", "flip flops",
+        "athletic wear", "sportswear", "hoodie", "sweatshirt"
+    }
     
-    if used_llm and lowered_detected & casual_keywords_for_guard:
+    # Check if any detected items contain casual keywords
+    has_casual = False
+    for detected in lowered_detected:
+        for casual_word in casual_keywords_for_guard:
+            if casual_word in detected:
+                has_casual = True
+                break
+        if has_casual:
+            break
+    
+    if used_llm and has_casual:
         if score is None or score >= 30:
-            score = 29
-            feedback = (feedback or "Low score due to casual attire rule.") + " (Attire Guard enforced score cap < 30)"
-        logger.info("Casual-attire guard applied; score capped below 30.")
+            score = 25
+            feedback = (feedback or "Low score due to casual attire.") + " (Casual attire detected - not suitable for professional interviews)"
+        logger.info("Casual-attire guard applied; score capped at 25.")
+    
+    # Additional check: If no items detected and LLM didn't work, be more conservative
+    if not detected_names and not used_llm:
+        score = 40
+        feedback = "Unable to detect clothing items. Please ensure good lighting and clear view of upper body for accurate analysis."
 
     # 4) Heuristic fallback if score is still None (or if LLM failed)
     if score is None or not used_llm:

@@ -83,7 +83,11 @@ services:
         value: 5003
       - key: FLASK_ENV
         value: production
-      - key: GOOGLE_APPLICATION_CREDENTIALS
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
         sync: false
 
   # 5. Mock Interview Service (Python + Gemini AI)
