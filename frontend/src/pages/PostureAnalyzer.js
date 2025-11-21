@@ -25,13 +25,8 @@ const PostureAnalyzer = () => {
   const sendFrameForAnalysis = async (imageSrc) => {
     if (!imageSrc) return;
     try {
-      const response = await fetch('/api/posture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageSrc.split(',')[1] })
-      });
-      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-      const data = await response.json();
+      const response = await api.post('/api/posture', { image: imageSrc.split(',')[1] });
+      const data = response.data;
       if (data.posture_score !== undefined) {
         setPostureScore(data.posture_score);
         setSessionScores(prev => [...prev, data.posture_score]);
@@ -72,8 +67,7 @@ const PostureAnalyzer = () => {
       const user = auth.currentUser;
       if (!user) { alert('User not authenticated.'); return; }
       const payload = { userId: user.uid, sessionData: { type:'posture', averageScore: +avg.toFixed(2), totalAnalyses: sessionScores.length, timestamp: new Date().toISOString() } };
-      const resp = await fetch('/api/posture/save-session', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if (!resp.ok) throw new Error('Save failed');
+      await api.post('/api/posture/save-session', payload);
       alert('Session saved successfully!');
       // Refresh history immediately after successful save
       fetchHistory();
@@ -91,10 +85,8 @@ const PostureAnalyzer = () => {
     if (!user) return;
     setHistoryLoading(true);
     try {
-      const resp = await fetch(`/api/posture/history?userId=${user.uid}`);
-      if (!resp.ok) throw new Error('History fetch failed');
-      const data = await resp.json();
-      setHistory(data.data || []);
+      const resp = await api.get(`/api/posture/history?userId=${user.uid}`);
+      setHistory(resp.data.data || []);
     } catch (e) {
       console.error('History load error', e);
       setHistory([]);
@@ -132,8 +124,7 @@ const PostureAnalyzer = () => {
     if (!sessionToDelete) return;
     setDeleteLoading(sessionToDelete.id);
     try {
-      const resp = await fetch(`/api/posture/history/${sessionToDelete.id}`, { method:'DELETE' });
-      if (!resp.ok) throw new Error('Delete failed');
+      await api.delete(`/api/posture/history/${sessionToDelete.id}`);
       setHistory(prev => prev.filter(h => h.id !== sessionToDelete.id));
       setShowDeleteModal(false);
       setSessionToDelete(null);
