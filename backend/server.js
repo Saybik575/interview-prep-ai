@@ -87,7 +87,7 @@ if (!admin.apps.length) {
 
 // Posture API proxy route - native implementation (no http-proxy-middleware)
 const POSTURE_SERVICE_URL = process.env.POSTURE_SERVICE_URL 
-  ? `https://${process.env.POSTURE_SERVICE_URL}` 
+  ? `https://${process.env.POSTURE_SERVICE_URL}.onrender.com` 
   : 'http://localhost:5001';
 app.use('/api/posture', async (req, res, next) => {
   try {
@@ -239,7 +239,7 @@ app.post('/api/proxy-dress-analysis', uploadMemory.single('file'), async (req, r
 
     // Forward to Flask analyze-dress endpoint
     const flaskUrl = process.env.DRESSING_SERVICE_URL 
-      ? `https://${process.env.DRESSING_SERVICE_URL}/api/analyze-dress` 
+      ? `https://${process.env.DRESSING_SERVICE_URL}.onrender.com/api/analyze-dress` 
       : 'http://localhost:5002/api/analyze-dress';
     // Increase timeout to 120s to match backend LLM request timeout and avoid
     // client-side cancellations for longer model generations.
@@ -469,7 +469,10 @@ app.post('/api/resume', upload.single('file'), async (req, res) => {
     if (req.body.userId) {
       form.append('userId', req.body.userId);
     }
-    const response = await axios.post('http://localhost:8000/analyze-resume', form, {
+    const resumeServiceUrl = process.env.RESUME_SERVICE_URL 
+      ? `https://${process.env.RESUME_SERVICE_URL}.onrender.com/analyze-resume` 
+      : 'http://localhost:5003/analyze-resume';
+    const response = await axios.post(resumeServiceUrl, form, {
       headers: form.getHeaders(),
     });
     fs.unlinkSync(req.file.path);
