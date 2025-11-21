@@ -387,25 +387,64 @@ if (db) {
 app.use('/api/interview', interviewRouter);
 
 // Routes
-// Proxy for deleting resume history (moved to correct place)
-app.post('/api/resume/history/delete', async (req, res) => {
+// Resume Analysis History - Get
+app.get('/api/resume/history', async (req, res) => {
+  const userId = req.query.userId || 'demoUser';
+  if (!db) {
+    console.warn('[Resume][history] Firestore not initialized');
+    return res.json([]);
+  }
   try {
-    const { userId, docId } = req.body;
-    const response = await axios.post('http://localhost:8000/resume/history/delete', { userId, docId });
-    res.status(response.status).json(response.data);
+    const snapshot = await db.collection('resume_analysis')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+    
+    const history = [];
+    snapshot.forEach(doc => {
+      const data = doc.to_dict();
+      history.push({
+        docId: doc.id,
+        analysisId: doc.id,
+        timestamp: data.timestamp?.toDate?.()?.toISOString() || data.timestamp || new Date().toISOString(),
+        score: data.score || 0,
+        similarity_with_jd: data.similarity_with_jd || 0,
+        ats_score: data.ats_score || 0,
+      });
+    });
+    console.log(`[Resume][history] Returned ${history.length} records for userId=${userId}`);
+    res.json(history);
   } catch (err) {
-    console.error('Error deleting history:', err?.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to delete history entry.' });
+    console.error('[Resume][history] Error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
-// Resume Analysis History Proxy Route
-app.get('/api/resume/history', async (req, res) => {
+
+// Resume Analysis History - Delete
+app.post('/api/resume/history/delete', async (req, res) => {
+  const { userId, docId } = req.body;
+  if (!db) {
+    return res.status(503).json({ error: 'Firestore not available' });
+  }
   try {
-    const userId = req.query.userId || 'demoUser';
-    const response = await axios.get(`http://localhost:8000/resume/history?userId=${encodeURIComponent(userId)}`);
-    res.json(response.data);
+    const docRef = db.collection('resume_analysis').doc(docId);
+    const doc = await docRef.get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    const data = doc.data();
+    if (data.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    await docRef.delete();
+    console.log(`[Resume][history] Deleted document ${docId} for user ${userId}`);
+    res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[Resume][history][delete] Error:', err);
+    res.status(500).json({ error: 'Failed to delete history entry.' });
   }
 });
 
