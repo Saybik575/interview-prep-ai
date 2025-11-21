@@ -304,13 +304,14 @@ app.get('/api/dress/history', async (req, res) => {
         .limit(max)
         .get();
       sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`[Dress][history] Returned ${sessions.length} records for userId=${userId}`);
+      console.log(`Dress history: Returned ${sessions.length} records for userId=${userId}`);
     } catch (err) {
       if (err && (err.code === 9 || err.code === 'FAILED_PRECONDITION')) {
         if (!postureIndexWarned) { console.warn('Missing index for dress history; falling back to client sort'); postureIndexWarned = true; }
         const snapshot = await db.collection('dress_sessions').where('userId', '==', userId).get();
         sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
           .sort((a,b) => (b.serverTimestamp || '').localeCompare(a.serverTimestamp || '')).slice(0, max);
+        console.log(`Dress history: Returned ${sessions.length} records for userId=${userId} (fallback)`);
         return res.json({ success: true, count: sessions.length, data: sessions, fallbackUsed: true });
       } else {
         throw err;
@@ -327,21 +328,21 @@ app.get('/api/dress/history', async (req, res) => {
 // Delete dress session
 app.delete('/api/dress/history/:docId', async (req, res) => {
   const { docId } = req.params;
-  console.log(`[DressDelete] Received delete request docId=${docId}`);
+  console.log(`DressDelete: Received delete request docId=${docId}`);
   try {
     if (!docId) return res.status(400).json({ error: 'Missing docId' });
-    if (!db) { console.warn('[DressDelete] Firestore not configured; returning success (dev mode)'); return res.json({ success: true, docId, warning: 'Firestore not configured' }); }
+    if (!db) { console.warn('DressDelete: Firestore not configured; returning success (dev mode)'); return res.json({ success: true, docId, warning: 'Firestore not configured' }); }
     const docRef = db.collection('dress_sessions').doc(docId);
     const snap = await docRef.get();
     if (!snap.exists) {
-      console.warn(`[DressDelete] docId=${docId} not found; returning success for idempotency`);
+      console.warn(`DressDelete: docId=${docId} not found; returning success for idempotency`);
       return res.json({ success: true, docId, warning: 'Session not found (idempotent delete)' });
     }
     await docRef.delete();
-    console.log(`[DressDelete] Deleted docId=${docId}`);
+    console.log(`DressDelete: Deleted docId=${docId}`);
     return res.json({ success: true, docId });
   } catch (err) {
-    console.error('[DressDelete] Error deleting:', err);
+    console.error('DressDelete: Error deleting:', err);
     return res.status(500).json({ error: 'Failed to delete dress session', message: err.message });
   }
 });
@@ -349,11 +350,11 @@ app.delete('/api/dress/history/:docId', async (req, res) => {
 app.post('/api/dress/history/delete', async (req, res) => {
   try {
     const { userId, docId } = req.body;
-    console.log(`[DressDeletePOST] Received delete request userId=${userId} docId=${docId}`);
+    console.log(`DressDeletePOST: Received delete request userId=${userId} docId=${docId}`);
     if (!docId) return res.status(400).json({ error: 'Missing docId' });
     // Mirror behavior of DELETE endpoint
     if (!db) {
-      console.warn('[DressDeletePOST] Firestore not configured; returning success (dev mode)');
+      console.warn('DressDeletePOST: Firestore not configured; returning success (dev mode)');
       return res.json({ success: true, docId, warning: 'Firestore not configured' });
     }
 
@@ -361,7 +362,7 @@ app.post('/api/dress/history/delete', async (req, res) => {
     const snap = await docRef.get();
     if (snap.exists) {
       await docRef.delete();
-      console.log(`[DressDeletePOST] Deleted docId=${docId}`);
+      console.log(`DressDeletePOST: Deleted docId=${docId}`);
       return res.json({ success: true, docId });
     }
 
@@ -370,14 +371,14 @@ app.post('/api/dress/history/delete', async (req, res) => {
     if (!querySnapshot.empty) {
       const matchedDoc = querySnapshot.docs[0];
       await matchedDoc.ref.delete();
-      console.log(`[DressDeletePOST] Deleted by sessionId=${docId} (docId=${matchedDoc.id})`);
+      console.log(`DressDeletePOST: Deleted by sessionId=${docId} (docId=${matchedDoc.id})`);
       return res.json({ success: true, docId: matchedDoc.id, deletedBy: 'sessionId' });
     }
 
-    console.warn(`[DressDeletePOST] docId/sessionId=${docId} not found; returning success for idempotency`);
+    console.warn(`DressDeletePOST: docId/sessionId=${docId} not found; returning success for idempotency`);
     return res.json({ success: true, docId, warning: 'Session not found (idempotent delete)' });
   } catch (err) {
-    console.error('[DressDeletePOST] Error deleting:', err);
+    console.error('DressDeletePOST: Error deleting:', err);
     return res.status(500).json({ error: 'Failed to delete dress session', message: err.message });
   }
 });
@@ -392,7 +393,7 @@ app.use('/api/interview', interviewRouter);
 app.get('/api/resume/history', async (req, res) => {
   const userId = req.query.userId || 'demoUser';
   if (!db) {
-    console.warn('[Resume][history] Firestore not initialized');
+    console.warn('Resume history: Firestore not initialized');
     return res.json([]);
   }
   try {
@@ -413,10 +414,10 @@ app.get('/api/resume/history', async (req, res) => {
         ats_score: data.ats_score || 0,
       });
     });
-    console.log(`[Resume][history] Returned ${history.length} records for userId=${userId}`);
+    console.log(`Resume history: Returned ${history.length} records for userId=${userId}`);
     res.json(history);
   } catch (err) {
-    console.error('[Resume][history] Error:', err);
+    console.error('Resume history: Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -441,10 +442,10 @@ app.post('/api/resume/history/delete', async (req, res) => {
     }
     
     await docRef.delete();
-    console.log(`[Resume][history] Deleted document ${docId} for user ${userId}`);
+    console.log(`Resume history: Deleted document ${docId} for user ${userId}`);
     res.json({ success: true });
   } catch (err) {
-    console.error('[Resume][history][delete] Error:', err);
+    console.error('Resume history delete: Error:', err);
     res.status(500).json({ error: 'Failed to delete history entry.' });
   }
 });
@@ -745,6 +746,7 @@ app.get('/api/posture/history', async (req, res) => {
             return (b.serverTimestamp || '').localeCompare(a.serverTimestamp || '');
           })
           .slice(0, max);
+        console.log(`Posture history: Returned ${sessions.length} records for userId=${userId} (fallback)`);
         return res.json({ success: true, count: sessions.length, data: sessions, fallbackUsed: true });
       } else {
         throw err;
@@ -762,16 +764,16 @@ app.get('/api/posture/history', async (req, res) => {
 // Delete a posture session by Firestore document id (diagnostic logging)
 app.delete('/api/posture/history/:docId', async (req, res) => {
   const { docId } = req.params;
-  console.log(`[PostureDelete] Received delete request docId=${docId}`);
+  console.log(`PostureDelete: Received delete request docId=${docId}`);
   try {
     if (!docId) {
-      console.error('[PostureDelete] Missing docId in params');
+      console.error('PostureDelete: Missing docId in params');
       return res.status(400).json({ error: 'Missing docId' });
     }
     // If Firestore is not configured, treat delete as a no-op but return success
     // so local development without Firebase doesn't surface a UI error.
     if (!db) {
-      console.warn('[PostureDelete] Firestore not configured. Skipping remote delete and returning success (dev mode).');
+      console.warn('PostureDelete: Firestore not configured. Skipping remote delete and returning success (dev mode).');
       return res.json({ success: true, docId, warning: 'Firestore not configured; nothing deleted on server' });
     }
 
@@ -780,26 +782,26 @@ app.delete('/api/posture/history/:docId', async (req, res) => {
     let snap = await docRef.get();
     if (snap.exists) {
       await docRef.delete();
-      console.log(`[PostureDelete] Deleted posture session docId=${docId}`);
+      console.log(`PostureDelete: Deleted posture session docId=${docId}`);
       return res.json({ success: true, docId });
     }
 
     // If the doc with that id doesn't exist, it's possible the frontend passed
     // the sessionId (generated by the app) instead of the Firestore document id.
     // Try to find a matching document by 'sessionId' field and delete it.
-    console.log(`[PostureDelete] No direct doc id match for ${docId}; attempting field lookup by sessionId`);
+    console.log(`PostureDelete: No direct doc id match for ${docId}; attempting field lookup by sessionId`);
     const querySnapshot = await db.collection('posture_sessions').where('sessionId', '==', docId).limit(1).get();
     if (!querySnapshot.empty) {
       const matchedDoc = querySnapshot.docs[0];
       await matchedDoc.ref.delete();
-      console.log(`[PostureDelete] Deleted posture session by sessionId=${docId} (docId=${matchedDoc.id})`);
+      console.log(`PostureDelete: Deleted posture session by sessionId=${docId} (docId=${matchedDoc.id})`);
       return res.json({ success: true, docId: matchedDoc.id, deletedBy: 'sessionId' });
     }
 
-    console.warn(`[PostureDelete] Session not found docId=${docId} (no doc and no matching sessionId)`);
+    console.warn(`PostureDelete: Session not found docId=${docId} (no doc and no matching sessionId)`);
     return res.status(404).json({ error: 'Session not found', docId });
   } catch (err) {
-    console.error(`[PostureDelete] Error deleting docId=${docId}:`, err);
+    console.error(`PostureDelete: Error deleting docId=${docId}:`, err);
     return res.status(500).json({ error: 'Failed to delete posture session', message: err.message, docId });
   }
 });
@@ -847,7 +849,7 @@ app.get('/api/interview/history', async (req, res) => {
 
     // Attach question counts (avoid full subcollection expansion for performance)
     // If you need full questions, the existing router (interview.js) handles that
-    console.log(`[Interview][history] Returned ${sessions.length} records for userId=${userId} fallback=${fallbackUsed}`);
+    console.log(`Interview history: Returned ${sessions.length} records for userId=${userId} fallback=${fallbackUsed}`);
     res.json({ success: true, count: sessions.length, sessions, fallbackUsed });
   } catch (error) {
     console.error('Error fetching interview history:', error);
@@ -858,7 +860,7 @@ app.get('/api/interview/history', async (req, res) => {
 // Delete interview session (shallow delete - does not remove questions subcollection here)
 app.delete('/api/interview/history/:docId', async (req, res) => {
   const { docId } = req.params;
-  console.log(`[InterviewDelete] Received delete request docId=${docId}`);
+  console.log(`InterviewDelete: Received delete request docId=${docId}`);
   try {
     if (!docId) return res.status(400).json({ error: 'Missing docId' });
     if (!db) return res.status(503).json({ error: 'Firestore not configured' });
@@ -872,13 +874,13 @@ app.delete('/api/interview/history/:docId', async (req, res) => {
       questionsSnap.forEach(q => batch.delete(q.ref));
       await batch.commit();
     } catch (subErr) {
-      console.warn('[InterviewDelete] Failed to delete some questions (continuing):', subErr.message);
+      console.warn('InterviewDelete: Failed to delete some questions (continuing):', subErr.message);
     }
     await ref.delete();
-    console.log(`[InterviewDelete] Deleted interview session docId=${docId}`);
+    console.log(`InterviewDelete: Deleted interview session docId=${docId}`);
     res.json({ success: true, docId });
   } catch (err) {
-    console.error(`[InterviewDelete] Error deleting docId=${docId}:`, err);
+    console.error(`InterviewDelete: Error deleting docId=${docId}:`, err);
     res.status(500).json({ error: 'Failed to delete interview session', message: err.message, docId });
   }
 });
