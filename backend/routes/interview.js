@@ -117,6 +117,8 @@ router.post('/evaluate', async (req, res) => {
       messages,
       userId,
       sessionId
+    }, {
+      timeout: 120000 // 120 second timeout
     });
 
     if (req.app.get('db')) {
@@ -178,6 +180,8 @@ router.post('/start', async (req, res) => {
       sessionId,
       userId,
       messages: []
+    }, {
+      timeout: 120000 // 120 second timeout for cold starts
     });
 
     if (req.app.get('db')) {
@@ -199,13 +203,22 @@ router.post('/start', async (req, res) => {
   } catch (err) {
     const info = extractAxiosErrorInfo(err);
     console.error('[Interview][start] Error calling Flask interview start:', info);
+    const statusCode = err.code === 'ECONNREFUSED' ? 503 : (err.response?.status || 500);
     let msg = 'Flask service error.';
-    if (err.response && err.response.data) {
+    
+    // Check for Gemini API quota error
+    if (err.response?.data?.error && err.response.data.error.includes('RESOURCE_EXHAUSTED')) {
+      msg = 'AI service quota exhausted. Please contact the administrator to update the API key.';
+    } else if (err.response?.data?.error && err.response.data.error.includes('429')) {
+      msg = 'AI service quota limit reached. Please try again later.';
+    } else if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+      msg = 'Interview service is starting up. Please try again in 30 seconds.';
+    } else if (err.response && err.response.data) {
       msg = err.response.data.error || JSON.stringify(err.response.data);
     } else if (err.message) {
       msg = err.message;
     }
-    res.status(500).json({ error: typeof msg === 'string' ? msg : JSON.stringify(msg) });
+    res.status(statusCode).json({ error: typeof msg === 'string' ? msg : JSON.stringify(msg) });
   }
 });
 

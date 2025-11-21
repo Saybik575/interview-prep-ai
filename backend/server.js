@@ -160,9 +160,13 @@ app.use('/api/posture', async (req, res, next) => {
     res.setHeader('content-length', buf.length);
     return res.end(buf);
   } catch (err) {
-    console.error('Posture proxy error:', err.message);
+    console.error('Posture proxy error:', err.message, err.code);
     if (!res.headersSent) {
-      res.status(502).json({ error: 'Bad gateway', detail: err.message });
+      const statusCode = err.code === 'ECONNREFUSED' ? 503 : 502;
+      res.status(statusCode).json({ 
+        error: err.code === 'ECONNREFUSED' ? 'Posture service starting' : 'Bad gateway', 
+        message: err.code === 'ECONNREFUSED' ? 'Service is starting up. Please try again in 30 seconds.' : err.message 
+      });
     }
   }
 });
@@ -252,12 +256,16 @@ app.post('/api/proxy-dress-analysis', uploadMemory.single('file'), async (req, r
     // If no JSON data, return 502
     return res.status(502).json({ error: 'Bad gateway: empty response from analysis service' });
   } catch (err) {
-    console.error('Error proxying dress analysis:', err?.response?.data || err.message || err);
+    console.error('Error proxying dress analysis:', err.message);
+    const statusCode = err.response?.status || (err.code === 'ECONNREFUSED' ? 503 : 500);
     if (err.response && err.response.data) {
       // Forward error from Flask if available
-      return res.status(err.response.status || 500).json(err.response.data);
+      return res.status(statusCode).json(err.response.data);
     }
-    return res.status(500).json({ error: 'Failed to proxy dress analysis', message: err.message });
+    return res.status(statusCode).json({ 
+      error: 'Dress analysis service unavailable', 
+      message: err.code === 'ECONNREFUSED' ? 'Service is starting up. Please try again in 30 seconds.' : err.message 
+    });
   }
 });
 
@@ -474,12 +482,19 @@ app.post('/api/resume', upload.single('file'), async (req, res) => {
       : 'http://localhost:5003/analyze-resume';
     const response = await axios.post(resumeServiceUrl, form, {
       headers: form.getHeaders(),
+      timeout: 120000 // 120 second timeout for cold starts
     });
     fs.unlinkSync(req.file.path);
     res.json(response.data);
   } catch (err) {
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: err.message });
+    console.error('Resume analysis error:', err.message);
+    const statusCode = err.response?.status || 500;
+    res.status(statusCode).json({ 
+      error: 'Resume analysis failed', 
+      message: err.message,
+      details: err.response?.data || 'Service unavailable. Please try again later.'
+    });
   }
 });
 
