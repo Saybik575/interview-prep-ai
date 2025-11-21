@@ -304,6 +304,7 @@ app.get('/api/dress/history', async (req, res) => {
         .limit(max)
         .get();
       sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`[Dress][history] Returned ${sessions.length} records for userId=${userId}`);
     } catch (err) {
       if (err && (err.code === 9 || err.code === 'FAILED_PRECONDITION')) {
         if (!postureIndexWarned) { console.warn('Missing index for dress history; falling back to client sort'); postureIndexWarned = true; }
@@ -846,7 +847,7 @@ app.get('/api/interview/history', async (req, res) => {
 
     // Attach question counts (avoid full subcollection expansion for performance)
     // If you need full questions, the existing router (interview.js) handles that
-    console.log(`Interview history: Returned ${sessions.length} records for userId=${userId} fallback=${fallbackUsed}`);
+    console.log(`[Interview][history] Returned ${sessions.length} records for userId=${userId} fallback=${fallbackUsed}`);
     res.json({ success: true, count: sessions.length, sessions, fallbackUsed });
   } catch (error) {
     console.error('Error fetching interview history:', error);
