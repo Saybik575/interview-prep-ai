@@ -1,30 +1,60 @@
 version: '3.8'
+
 services:
+
+# 1. Node.js Express Gateway (Frontend entry point and orchestrator)
+  api-gateway:
+    build: ./gateway-service # Assuming your Node.js code is here
+    # Only the gateway needs to expose a port to the host machine
+    ports:
+      - "5000:5000" 
+    restart: always
+    environment:
+      # Use the Docker Compose service names and internal ports (e.g., 5002 for posture)
+      - MOCK_INTERVIEW_SERVICE_URL=http://mock-interview-service:5004
+      - RESUME_SERVICE_URL=http://resume-analysis-service:5003
+      - POSTURE_SERVICE_URL=http://posture-analysis-service:5001
+      - DRESSING_SERVICE_URL=http://dressing-analysis-service:5002
+      # --- Add ALL Firestore/API Keys here ---
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - posture-analysis-service
+      - dressing-analysis-service
+      - resume-analysis-service
+      - mock-interview-service
+
+# 2. Python Microservices (Internal Services - NO external ports mapped)
   mock-interview-service:
     build: ./mock-interview-service
-    ports:
-      - "5000:5000"
+    # ports: # Removed port mapping
     restart: always
     environment:
       - PYTHONUNBUFFERED=1
+    # NOTE: Since this is now listed as a separate Python service, ensure the gateway uses this service URL too.
+
   dressing-analysis-service:
     build: ./dressing-analysis-service
-    ports:
-      - "5001:5001"
+    # ports: # Removed port mapping
     restart: always
     environment:
       - PYTHONUNBUFFERED=1
+      
   posture-analysis-service:
     build: ./posture-analysis-service
-    ports:
-      - "5002:5002"
+    # ports: # Removed port mapping
     restart: always
     environment:
       - PYTHONUNBUFFERED=1
+
   resume-analysis-service:
     build: ./resume-analysis-service
-    ports:
-      - "5003:5003"
+    # ports: # Removed port mapping
     restart: always
     environment:
       - PYTHONUNBUFFERED=1
+
+volumes:
+  # ollama-data volume removed
