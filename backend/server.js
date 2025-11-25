@@ -1,3 +1,5 @@
+// server.js - FULL CORRECTED CODE (Removed GET /api/interview/history)
+
 const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
@@ -866,84 +868,7 @@ app.delete('/api/posture/history/:docId', async (req, res) => {
   }
 });
 
-// Interview session history endpoint (similar fallback logic to posture history)
-app.get('/api/interview/history', async (req, res) => {
-  try {
-    const { userId, limit = 50 } = req.query;
-    if (!userId) return res.status(400).json({ error: 'Missing required query param: userId' });
-    if (!db) return res.json({ success: true, count: 0, sessions: [], fallbackUsed: true });
 
-    const max = Number(limit) || 50;
-    let sessions = [];
-    let fallbackUsed = false;
-    try {
-      // Primary query (may need composite index userId + startedAt DESC)
-      const snapshot = await db.collection('interview_sessions')
-        .where('userId', '==', userId)
-        .orderBy('startedAt', 'desc')
-        .limit(max)
-        .get();
-      sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (err) {
-      if (err && (err.code === 9 || err.code === 'FAILED_PRECONDITION')) {
-        if (!postureIndexWarned) { // reuse throttle flag
-          console.warn('Missing composite index for interview history. Falling back to client-side sort. Deploy index for performance.');
-          postureIndexWarned = true; // reuse so we log once across both types
-        }
-        const snapshot = await db.collection('interview_sessions')
-          .where('userId', '==', userId)
-          .get();
-        sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-          .sort((a,b) => {
-            const av = (b.startedAt || a.startedAt || {});
-            const aTime = a.startedAt?.toDate ? a.startedAt.toDate().getTime() : (a.startedAt?._seconds ? a.startedAt._seconds * 1000 : new Date(a.startedAt || 0).getTime());
-            const bTime = b.startedAt?.toDate ? b.startedAt.toDate().getTime() : (b.startedAt?._seconds ? b.startedAt._seconds * 1000 : new Date(b.startedAt || 0).getTime());
-            return bTime - aTime;
-          })
-          .slice(0, max);
-        fallbackUsed = true;
-      } else {
-        throw err;
-      }
-    }
-
-    // Attach question counts (avoid full subcollection expansion for performance)
-    // If you need full questions, the existing router (interview.js) handles that
-    console.log(`Interview history: Returned ${sessions.length} records for userId=${userId} fallback=${fallbackUsed}`);
-    res.json({ success: true, count: sessions.length, sessions, fallbackUsed });
-  } catch (error) {
-    console.error('Error fetching interview history:', error);
-    res.status(500).json({ error: 'Failed to fetch interview history', message: error.message });
-  }
-});
-
-// Delete interview session (shallow delete - does not remove questions subcollection here)
-app.delete('/api/interview/history/:docId', async (req, res) => {
-  const { docId } = req.params;
-  console.log(`InterviewDelete: Received delete request docId=${docId}`);
-  try {
-    if (!docId) return res.status(400).json({ error: 'Missing docId' });
-    if (!db) return res.status(503).json({ error: 'Firestore not configured' });
-    const ref = db.collection('interview_sessions').doc(docId);
-    const snap = await ref.get();
-    if (!snap.exists) return res.status(404).json({ error: 'Session not found', docId });
-    // Optional: delete subcollection 'questions'
-    try {
-      const questionsSnap = await ref.collection('questions').get();
-      const batch = db.batch();
-      questionsSnap.forEach(q => batch.delete(q.ref));
-      await batch.commit();
-    } catch (subErr) {
-      console.warn('InterviewDelete: Failed to delete some questions (continuing):', subErr.message);
-    }
-    await ref.delete();
-    console.log(`InterviewDelete: Deleted interview session docId=${docId}`);
-    res.json({ success: true, docId });
-  } catch (err) {
-    console.error(`InterviewDelete: Error deleting docId=${docId}:`, err);
-    res.status(500).json({ error: 'Failed to delete interview session', message: err.message, docId });
-  }
-});
 
 // 404 handler (must come before error middleware and AFTER all valid routes)
 app.use((req, res) => {

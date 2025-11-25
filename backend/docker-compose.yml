@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  mock-interview-service:
+    build: ./mock-interview-service
+    ports:
+      - "5000:5000"
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+  dressing-analysis-service:
+    build: ./dressing-analysis-service
+    ports:
+      - "5001:5001"
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+  posture-analysis-service:
+    build: ./posture-analysis-service
+    ports:
+      - "5002:5002"
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+  resume-analysis-service:
+    build: ./resume-analysis-service
+    ports:
+      - "5003:5003"
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1

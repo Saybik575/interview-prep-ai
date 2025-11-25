@@ -2,5 +2,15 @@
   "files.associations": {
     "*.css": "tailwindcss"
   },
-  "cmake.allowCommentsInPresetsFile": false
+  "cmake.allowCommentsInPresetsFile": false,
+  "python.defaultInterpreterPath": "D:/Satvik/Programming Language/Python3.12.9/python.exe",
+  "terminal.integrated.env.windows": {
+    "PATH": "D:\\Satvik\\Programming Language\\Python3.12.9;D:\\Satvik\\Programming Language\\Python3.12.9\\Scripts;D:\\Satvik\\Programming Language\\Nodejs;C:\\Users\\Satvik\\AppData\\Roaming\\npm;${env:PATH}"
+  },
+  "python.analysis.extraPaths": [
+    "D:/Satvik/Programming Language/Python3.12.9/Lib/site-packages"
+  ],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "none"
+  }
 } 

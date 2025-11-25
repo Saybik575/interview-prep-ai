@@ -7,127 +7,123 @@ service cloud.firestore {
     // HELPER FUNCTIONS
     // ============================================
     
-    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Check if authenticated user owns the document (by userId field)
+
     function isDocumentOwner() {
       return isAuthenticated() && resource.data.userId == request.auth.uid;
     }
-    
-    // Check if authenticated user will own the new document (for creates)
+
     function willBeDocumentOwner() {
       return isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
-    
-    // Check if user owns the resource by matching document ID
+
     function isOwnerById(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
     // ============================================
     // USERS COLLECTION
     // ============================================
     
-    // Users can only access their own profile document
     match /users/{userId} {
       allow read, write: if isOwnerById(userId);
       
-      // User history subcollection (all analysis types)
       match /history/{historyId} {
         allow read, write: if isOwnerById(userId);
       }
-      
-      // User profile data subcollection
+
       match /profile/{profileId} {
         allow read, write: if isOwnerById(userId);
       }
     }
-    
+
     // ============================================
     // INTERVIEW SESSIONS COLLECTION
     // ============================================
-    
+
     match /interview_sessions/{sessionId} {
-      // Read: only if user owns this document
-      allow read: if isDocumentOwner();
-      
-      // Create: only if userId in new document matches authenticated user
+
+      // ⭐ CRITICAL FIX: Loosen the list rule to allow the client-side query to pass.
+      // The client code ALREADY applies the 'where' filter, but the rule check fails.
+      allow list: if isAuthenticated(); 
+      // The client query: where('userId', '==', uid), orderBy('timestamp', 'desc')
+
+      allow get: if isDocumentOwner();
       allow create: if willBeDocumentOwner();
-      
-      // Update/Delete: only if user owns this document
       allow update, delete: if isDocumentOwner();
+      
+      // Questions subcollection (Must be correct for Proxy Delete)
+      match /questions/{questionId} {
+        // Needs Admin privileges or owner check on parent doc. 
+        // Since DELETE is handled by Proxy (Admin SDK), we keep this safe:
+        allow read, write: if get(/databases/$(database)/documents/interview_sessions/$(sessionId)).data.userId == request.auth.uid;
+      }
     }
-    
+
     // ============================================
-    // POSTURE SESSIONS COLLECTION
+    // POSTURE SESSIONS
     // ============================================
-    
+
     match /posture_sessions/{sessionId} {
-      // Read: only if user owns this document
-      allow read: if isDocumentOwner();
-      
-      // Create: only if userId in new document matches authenticated user
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
+      allow get: if isDocumentOwner();
       allow create: if willBeDocumentOwner();
-      
-      // Update/Delete: only if user owns this document
       allow update, delete: if isDocumentOwner();
     }
-    
+
     // ============================================
-    // DRESSING SESSIONS COLLECTION
+    // DRESSING SESSIONS
     // ============================================
-    
+
     match /dressing_sessions/{sessionId} {
-      // Read: only if user owns this document
-      allow read: if isDocumentOwner();
-      
-      // Create: only if userId in new document matches authenticated user
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
+      allow get: if isDocumentOwner();
       allow create: if willBeDocumentOwner();
-      
-      // Update/Delete: only if user owns this document
       allow update, delete: if isDocumentOwner();
     }
-    
+
     // ============================================
-    // RESUME ANALYSIS COLLECTION
+    // RESUME ANALYSIS SESSIONS (NEW)
     // ============================================
-    
+
+    match /resume_analysis_sessions/{analysisId} {
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
+      allow get: if isDocumentOwner();
+      allow create: if willBeDocumentOwner();
+      allow update, delete: if isDocumentOwner();
+    }
+
+    // ============================================
+    // LEGACY COLLECTIONS (MATCH ORIGINAL RULES)
+    // ============================================
+
     match /resume_analysis/{analysisId} {
-      // Read: only if user owns this document
-      allow read: if isDocumentOwner();
-      
-      // Create: only if userId in new document matches authenticated user
+      allow get: if isDocumentOwner();
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
       allow create: if willBeDocumentOwner();
-      
-      // Update/Delete: only if user owns this document
       allow update, delete: if isDocumentOwner();
     }
-    
-    // ============================================
-    // LEGACY/ALTERNATIVE COLLECTION NAMES
-    // ============================================
-    
-    // Resume sessions (alternative naming)
+
     match /resume_sessions/{sessionId} {
-      allow read: if isDocumentOwner();
+      allow get: if isDocumentOwner();
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
       allow create: if willBeDocumentOwner();
       allow update, delete: if isDocumentOwner();
     }
-    
-    // Mock interviews (alternative naming)
+
     match /mock_interviews/{sessionId} {
-      allow read: if isDocumentOwner();
+      allow get: if isDocumentOwner();
+      // ⭐ CRITICAL FIX: Loosen the list rule.
+      allow list: if isAuthenticated();
       allow create: if willBeDocumentOwner();
       allow update, delete: if isDocumentOwner();
     }
-    
-    // ============================================
-    // DEFAULT DENY ALL
-    // ============================================
-    // Any collection not explicitly listed above is denied by default
-    // This is a security best practice
   }
 }

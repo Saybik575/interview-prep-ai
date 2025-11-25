@@ -108,7 +108,6 @@ Be encouraging but honest. Focus on constructive feedback."""
         response_text = response_text.strip()
         
         # Parse JSON
-        import json
         analysis = json.loads(response_text)
         
         logger.info(f"Gemini analysis complete - Score: {analysis.get('score', 0)}/100")

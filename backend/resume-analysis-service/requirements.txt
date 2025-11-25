@@ -1,7 +1,7 @@
-flask==3.0.0
-flask-cors==4.0.0
-python-dotenv==1.0.0
-werkzeug==3.0.1
-docx2txt==0.8
-pdfminer.six==20231228
-google-cloud-firestore==2.14.0
+flask>=3.0.0
+flask-cors>=4.0.0
+python-dotenv>=1.0.0
+werkzeug>=3.0.0
+docx2txt>=0.8
+pdfminer.six>=20231228
+google-cloud-firestore>=2.14.0

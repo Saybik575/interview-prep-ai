@@ -1,48 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # AI Interview Preparation App - Development Startup Script
 
 echo "🚀 Starting AI Interview Preparation App in development mode..."
 echo ""
 
-# Function to check if a port is in use (portable: tries lsof, then netstat, then python)
+# Simple port check function for Windows Git Bash
 check_port() {
-    PORT=$1
-    # If lsof exists, prefer it
-    if command -v lsof >/dev/null 2>&1; then
-        if lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    local PORT=$1
+    if command -v netstat >/dev/null 2>&1; then
+        if netstat -ano 2>/dev/null | grep ":${PORT}" | grep "LISTENING" >/dev/null 2>&1; then
             echo "❌ Port $PORT is already in use. Please free it first."
             return 1
-        else
-            return 0
-        fi
-    elif command -v netstat >/dev/null 2>&1; then
-        # Works in Git Bash on Windows (uses Windows netstat)
-        if netstat -ano 2>/dev/null | grep -E "[:\.]${PORT}[[:space:]]" | grep LISTEN >/dev/null 2>&1; then
-            echo "❌ Port $PORT is already in use. Please free it first."
-            return 1
-        else
-            return 0
-        fi
-    else
-        # Fallback: attempt to bind with python
-        python - <<PY $PORT
-import socket, sys
-port = int(sys.argv[1])
-s = socket.socket()
-try:
-    s.bind(("127.0.0.1", port))
-except OSError:
-    sys.exit(1)
-sys.exit(0)
-PY
-        if [ $? -ne 0 ]; then
-            echo "❌ Port $PORT is already in use. Please free it first."
-            return 1
-        else
-            return 0
         fi
     fi
+    return 0
 }
 
 # Check if ports are available

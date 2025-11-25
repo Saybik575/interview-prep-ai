@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// Backend API base URL - uses environment variable in production, localhost in development
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Backend API base URL for deployment
+// Set REACT_APP_API_URL in Vercel to your Render backend URL, e.g. https://your-backend.onrender.com
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 
 // Create axios instance with custom configuration
 const api = axios.create({
@@ -15,7 +16,8 @@ const api = axios.create({
 // Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // 💡 Helpful console log to confirm the URL being used
+    console.log(`API Request: ${config.method?.toUpperCase()} ${API_BASE_URL}${config.url}`);
     return config;
   },
   (error) => {
@@ -30,6 +32,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Handling specific network errors
     if (error.code === 'ECONNABORTED') {
       console.error('Request timeout - backend service may be waking up from sleep');
       error.message = 'Service is starting up, please wait and try again in 30 seconds';
@@ -39,6 +42,10 @@ api.interceptors.response.use(
     } else if (error.response?.status === 503) {
       console.error('503 Service Unavailable');
       error.message = 'Service temporarily unavailable. Please try again.';
+    } else if (error.response?.status === 404 && error.config.url.includes('/history')) {
+       // ❗ Custom error message for history 404
+       console.error('History 404: Check if Express is running and routing /api/interview/history correctly.');
+       error.message = 'History Service Not Found (404). Ensure your Node.js server is running and the history route is correctly defined.';
     }
     return Promise.reject(error);
   }

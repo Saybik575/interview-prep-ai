@@ -95,8 +95,26 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Note: History endpoints (/resume/history) are handled by the Express backend (server.js)
-# which connects directly to Firestore. No need for duplicate endpoints here.
+
+# Resume history endpoint for frontend compatibility
+@app.route('/api/resume/history', methods=['GET'])
+def get_resume_history():
+    user_id = request.args.get('userId')
+    if not user_id:
+        return jsonify({'error': 'Missing userId'}), 400
+    if db is None:
+        return jsonify({'error': 'Firestore not initialized'}), 500
+    try:
+        # Query Firestore for resume analysis history for the user
+        docs = db.collection('resume_analysis').where('userId', '==', user_id).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(20).stream()
+        history = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+            history.append(data)
+        return jsonify({'history': history}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/analyze-resume', methods=['POST'])
 def analyze_resume():

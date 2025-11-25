@@ -1,25 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+// /mnt/data/MockInterviewPage.js
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/config";
 import { Container, Card, Form, Button, Row, Col, Alert, Table, Spinner, Modal } from "react-bootstrap";
 import MockInterviewChat from "./MockInterviewChat";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
 // Helper function to safely format dates
 const formatDate = (dateValue) => {
   if (!dateValue) return "N/A";
-  
   try {
-    // If it's already a Date object
-    if (dateValue instanceof Date) {
-      return isNaN(dateValue.getTime()) ? "N/A" : dateValue.toLocaleString();
+    if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+        return dateValue.toDate().toLocaleString();
     }
-    
-    // If it's a Firestore Timestamp object with _seconds
     if (dateValue._seconds) {
       return new Date(dateValue._seconds * 1000).toLocaleString();
     }
-    
-    // Try to parse it as a date string or timestamp
     const parsed = new Date(dateValue);
     return isNaN(parsed.getTime()) ? "N/A" : parsed.toLocaleString();
   } catch (err) {
@@ -37,7 +33,12 @@ const CATEGORIES = {
     "Mobile Developer",
     "Embedded Systems Engineer",
     "Game Developer",
-    "Blockchain Developer"
+    "Blockchain Developer",
+    "Engineering Manager",
+    "SDET (Software Development Engineer in Test)",
+    "Release Engineer",
+    "Graphics Programmer",
+    "API Developer"
   ],
   "Data & AI": [
     "Data Engineer",
@@ -46,24 +47,42 @@ const CATEGORIES = {
     "MLOps Engineer",
     "Business Intelligence Engineer",
     "Data Analyst",
-    "Quantitative Analyst"
+    "Quantitative Analyst",
+    "AI/Research Scientist",
+    "Deep Learning Engineer",
+    "NLP Engineer",
+    "Computer Vision Engineer",
+    "Data Architect"
   ],
   "Cloud & DevOps": [
     "DevOps Engineer",
     "SRE",
     "Cloud Engineer",
-    "MLOps Engineer"
+    "MLOps Engineer",
+    "Cloud Architect",
+    "Solutions Architect",
+    "System Administrator",
+    "Network Engineer",
+    "IT Support Specialist"
   ],
   "Security": [
     "Cybersecurity Engineer",
     "SOC Analyst",
-    "Privacy Engineer"
+    "Privacy Engineer",
+    "Information Security Analyst",
+    "Penetration Tester",
+    "Security Architect",
+    "Forensics Analyst"
   ],
   "Product & Design": [
     "Product Manager",
     "Product Designer",
     "UX Researcher",
-    "UX/UI Designer"
+    "UX/UI Designer",
+    "Design Lead",
+    "Technical Product Manager",
+    "Content Strategist",
+    "Service Designer"
   ],
   "Business & Marketing": [
     "Project Manager",
@@ -72,25 +91,40 @@ const CATEGORIES = {
     "Digital Marketer",
     "Growth Analyst",
     "Sales Engineer",
-    "Customer Success Manager"
+    "Customer Success Manager",
+    "Management Consultant",
+    "Financial Analyst",
+    "Operations Manager",
+    "SEO Specialist",
+    "Content Marketing Manager"
   ],
   "Creative": [
     "Content Writer",
     "Copywriter",
     "Graphic Designer",
-    "Video Editor"
+    "Video Editor",
+    "Technical Writer",
+    "Motion Graphics Designer",
+    "Illustrator"
   ],
   "Healthcare": [
     "Healthcare Data Analyst",
-    "Clinical Operations Coordinator"
+    "Clinical Operations Coordinator",
+    "Health Informatics Specialist",
+    "Medical Science Liaison",
+    "Biostatistician"
   ]
 };
-
 const DIFFICULTIES = ["Beginner (Entry Level)", "Intermediate (Mid Level)", "Expert (Senior Level)"];
+
+const getDefaultPosition = (category) => {
+    const roles = CATEGORIES[category];
+    return (roles && roles.length > 0) ? roles[0] : "";
+};
 
 const MockInterviewPage = () => {
   const [category, setCategory] = useState("Software Engineering");
-  const [position, setPosition] = useState(CATEGORIES["Software Engineering"][0]);
+  const [position, setPosition] = useState(getDefaultPosition("Software Engineering")); 
   const [difficulty, setDifficulty] = useState(DIFFICULTIES[0]);
   const [interviewStarted, setInterviewStarted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -101,50 +135,68 @@ const MockInterviewPage = () => {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
-  // Advanced history management states
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortKey, setSortKey] = useState("startedAt");
+  const [sortKey, setSortKey] = useState("timestamp");
   const [sortDirection, setSortDirection] = useState("desc");
   const [showLatestOnly, setShowLatestOnly] = useState(false);
+  // State to hold optimistic session data until fetch verifies it
+  const [optimisticSession, setOptimisticSession] = useState(null); 
 
   useEffect(() => {
-    // update position when category changes
-    setPosition(CATEGORIES[category][0]);
+    setPosition(getDefaultPosition(category));
   }, [category]);
 
-  const fetchHistory = async () => {
+  // ----------------------------------------------------
+  // HISTORY FETCHING (Direct Firestore) — now accepts optional uid
+  // ----------------------------------------------------
+  const fetchHistoryClient = useCallback(async (uidOptional) => {
+    const uid = uidOptional || (auth.currentUser ? auth.currentUser.uid : null);
+    if (!uid) { setHistory([]); return; }
+    
     setIsHistoryLoading(true);
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        setHistory([]);
-        setIsHistoryLoading(false);
-        return;
-      }
-      const res = await api.get(`/api/interview/history?userId=${user.uid}`);
-      if (res.data && Array.isArray(res.data)) {
-        // Convert Firestore Timestamp objects to Date objects
-        const processedData = res.data.map(session => ({
-          ...session,
-          startedAt: session.startedAt && session.startedAt._seconds 
-            ? new Date(session.startedAt._seconds * 1000) 
-            : session.startedAt
-        }));
-        setHistory(processedData);
-      } else {
-        setHistory([]);
-      }
+      const sessionsRef = collection(db, 'interview_sessions');
+      const q = query(
+        sessionsRef,
+        where('userId', '==', uid),
+        orderBy('timestamp', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const fetchedData = [];
+      
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        fetchedData.push({
+            sessionId: docSnap.id,
+            position: data.position,
+            difficulty: data.difficulty,
+            startedAt: data.startedAt,
+            questionCount: data.questionCount || 0,
+            averageScore: data.averageScore,
+            timestamp: data.timestamp, 
+        });
+      });
+      
+      setHistory(fetchedData);
+      setError('');
     } catch (err) {
-      console.error("Failed to fetch interview history:", err);
+      console.error("Failed to fetch interview history directly from Firestore:", err);
+      setError('Failed to load history: ' + (err.message || err));
       setHistory([]);
     } finally {
       setIsHistoryLoading(false);
     }
-  };
+  }, []);
+
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) fetchHistoryClient(user.uid);
+      else setHistory([]);
+    });
+    return () => unsubscribe();
+  }, [fetchHistoryClient]);
 
   const handleDeleteClick = (item) => {
     setItemToDelete(item);
@@ -153,14 +205,9 @@ const MockInterviewPage = () => {
 
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
-
     try {
       const response = await api.delete(`/api/interview/history/${itemToDelete.sessionId}`);
-      
-      // Remove from local state
       setHistory(prev => prev.filter(s => s.sessionId !== itemToDelete.sessionId));
-      
-      // Show success message
       alert(response.data.message || "Interview session deleted successfully.");
     } catch (err) {
       console.error("Failed to delete session:", err);
@@ -178,11 +225,10 @@ const MockInterviewPage = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setOptimisticSession(null);
     try {
       const user = auth.currentUser;
       const userId = user ? user.uid : null;
-      // Call Express proxy if exists, otherwise talk to Flask directly:
-      // Express proxy endpoint: /api/interview/start
       const res = await api.post("/api/interview/start", {
         category,
         job_position: position,
@@ -235,6 +281,17 @@ const MockInterviewPage = () => {
           content: res.data.next_question || "Thank you — no follow-up question."
         };
         setMessages([...newMessages, feedbackMsg, nextQuestionMsg]);
+        
+        // optimistic session update
+        const currentAvgScore = res.data.score;
+        setOptimisticSession(prev => ({
+            sessionId: sessionId || `local-${Date.now()}`,
+            position: position,
+            difficulty: difficulty,
+            startedAt: new Date(),
+            questionCount: (prev?.questionCount || 0) + 1,
+            averageScore: currentAvgScore
+        }));
       } else {
         setMessages(prev => [...prev, { role: "assistant", content: "No valid feedback returned by AI." }]);
       }
@@ -246,61 +303,94 @@ const MockInterviewPage = () => {
     }
   };
 
-  const handleEndInterview = () => {
+  // --- FIXED: ensure fetchHistoryClient is called with uid, reconcile, THEN clear optimisticSession ---
+  const handleEndInterview = async () => {
+    // 1. Optimistically prepend the session data if available
+    if (optimisticSession) {
+        setHistory(prev => [optimisticSession, ...prev.filter(h => h.sessionId !== optimisticSession.sessionId)]);
+    }
+    
+    // 2. Clear current session state that should be reset immediately
     setInterviewStarted(false);
     setMessages([]);
     setSessionId(null);
     setError("");
-    fetchHistory(); // Refresh history after interview ends
+    
+    // 3. Reconcile with server-side history (pass uid explicitly)
+    const user = auth.currentUser;
+    try {
+      await fetchHistoryClient(user ? user.uid : null);
+    } catch (err) {
+      console.warn('fetchHistoryClient during endInterview failed', err);
+    } finally {
+      // 4. Keep optimisticSession until server data arrives; then clear to avoid duplication
+      setOptimisticSession(null);
+    }
   };
 
   // Memoized filtered and sorted history
   const processedHistory = useMemo(() => {
     let filtered = history;
-    // Filter by searchTerm
+
+    // If optimisticSession exists, ensure it is included for immediate display
+    if (optimisticSession) {
+        const exists = filtered.some(h => h.sessionId === optimisticSession.sessionId);
+        if (!exists) {
+            filtered = [optimisticSession, ...filtered];
+        }
+    }
+    
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter((item) => {
         const positionStr = (item.position || "").toLowerCase();
         const difficultyStr = (item.difficulty || "").toLowerCase();
-        const dateStr = formatDate(item.startedAt).toLowerCase();
+        const dateVal = item.startedAt || item.timestamp;
+        const dateStr = dateVal ? formatDate(dateVal).toLowerCase() : '';
         const scoreStr = String(item.averageScore ?? "");
         return positionStr.includes(term) || difficultyStr.includes(term) || dateStr.includes(term) || scoreStr.includes(term);
       });
     }
-    // Sort
+
     filtered = [...filtered].sort((a, b) => {
       let aVal = a[sortKey];
       let bVal = b[sortKey];
-      if (sortKey === "startedAt") {
-        aVal = a.startedAt ? new Date(a.startedAt).getTime() : 0;
-        bVal = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+      
+      if (sortKey === "timestamp" || sortKey === "startedAt") {
+        const aDate = a.startedAt || a.timestamp;
+        const bDate = b.startedAt || b.timestamp;
+        aVal = aDate ? (aDate.toDate ? aDate.toDate().getTime() : new Date(aDate).getTime()) : 0;
+        bVal = bDate ? (bDate.toDate ? bDate.toDate().getTime() : new Date(bDate).getTime()) : 0;
       }
+      if (sortKey === "averageScore" || sortKey === "questionCount") {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+      }
+      
       if (sortDirection === "asc") {
         return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
       } else {
         return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
       }
     });
-    // Latest only
+
     if (showLatestOnly && filtered.length) {
       return [filtered[0]];
     }
     return filtered;
-  }, [history, searchTerm, sortKey, sortDirection, showLatestOnly]);
+  }, [history, searchTerm, sortKey, sortDirection, showLatestOnly, optimisticSession]);
 
-  // Export to CSV
   const handleExport = () => {
     if (!processedHistory.length) return;
     const headers = ["Date", "Position", "Difficulty", "Questions", "Avg Score"];
     const rows = processedHistory.map((h) => {
-      const dateStr = formatDate(h.startedAt);
+      const dateStr = formatDate(h.startedAt || h.timestamp);
       return [
         dateStr,
         h.position || "",
         h.difficulty || "",
         h.questionCount || 0,
-        h.averageScore !== undefined ? h.averageScore.toFixed(1) : "N/A",
+        h.averageScore !== undefined ? (typeof h.averageScore === 'number' ? h.averageScore.toFixed(1) : h.averageScore) : "N/A",
       ];
     });
     let csv = headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
@@ -361,7 +451,6 @@ const MockInterviewPage = () => {
             </Card.Body>
           </Card>
 
-          {/* Interview Strategy Tips */}
           <Card className="mb-4 shadow">
             <Card.Body>
               <h3>Interview Strategy Tips</h3>
@@ -373,11 +462,9 @@ const MockInterviewPage = () => {
             </Card.Body>
           </Card>
 
-          {/* Interview History */}
           <Card className="mb-4 shadow">
             <Card.Body>
               <h3>History</h3>
-              {/* Advanced Controls */}
               <div className="d-flex flex-wrap gap-3 mb-3 align-items-center">
                 <Form.Control
                   type="text"
@@ -391,7 +478,7 @@ const MockInterviewPage = () => {
                   onChange={e => setSortKey(e.target.value)}
                   style={{ maxWidth: 160 }}
                 >
-                  <option value="startedAt">Sort by Date</option>
+                  <option value="timestamp">Sort by Date</option>
                   <option value="position">Sort by Position</option>
                   <option value="averageScore">Sort by Score</option>
                   <option value="questionCount">Sort by Questions</option>
@@ -434,13 +521,13 @@ const MockInterviewPage = () => {
                   ) : processedHistory.length ? (
                     processedHistory.map((session) => (
                       <tr key={session.sessionId}>
-                        <td>{formatDate(session.startedAt)}</td>
+                        <td>{formatDate(session.startedAt || session.timestamp)}</td>
                         <td>{session.position}</td>
                         <td>{session.difficulty}</td>
                         <td>{session.questionCount || 0}</td>
                         <td>
                           {session.averageScore !== undefined 
-                            ? `${session.averageScore.toFixed(1)}/10` 
+                            ? `${(typeof session.averageScore === 'number' ? session.averageScore.toFixed(1) : session.averageScore)}/10` 
                             : 'N/A'}
                         </td>
                         <td>
@@ -478,7 +565,6 @@ const MockInterviewPage = () => {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Delete</Modal.Title>
@@ -488,7 +574,7 @@ const MockInterviewPage = () => {
           {itemToDelete && (
             <div className="mt-2">
               <strong>Position:</strong> {itemToDelete.position}<br />
-              <strong>Date:</strong> {formatDate(itemToDelete.startedAt)}
+              <strong>Date:</strong> {formatDate(itemToDelete.startedAt || itemToDelete.timestamp)}
             </div>
           )}
         </Modal.Body>

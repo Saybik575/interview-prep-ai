@@ -1,6 +1,6 @@
 {
   "name": "interview-prep-ai-frontend",
-  "proxy": "http://localhost:5000",
+  "proxy": "http://localhost:5004",
   "version": "1.0.0",
   "description": "Frontend for AI-Powered Interview Preparation App",
   "private": true,

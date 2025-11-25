@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Card, Form, Button, Spinner } from "react-bootstrap";
 
-const MockInterviewChat = ({ category, position, difficulty, messages, onSend, loading, onEndInterview }) => {
+// Removed 'interviewRound' from props
+const MockInterviewChat = ({ category, position, difficulty, messages, onSend, loading, onEndInterview }) => { 
   const [input, setInput] = useState("");
   const scrollRef = useRef();
 
@@ -24,6 +25,7 @@ const MockInterviewChat = ({ category, position, difficulty, messages, onSend, l
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
             <h3 className="mb-0">Mock Interview In Progress</h3>
+            {/* Removed interviewRound display */}
             <small className="text-muted">Role: <strong>{position}</strong> • Category: {category} • Difficulty: {difficulty}</small>
           </div>
           <div>

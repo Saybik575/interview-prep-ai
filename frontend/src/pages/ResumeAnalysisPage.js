@@ -12,15 +12,46 @@ import {
   Row,
   Col,
   Alert,
+  Badge
 } from "react-bootstrap";
 import { getAuth } from 'firebase/auth';
+// Import Firestore dependencies directly
+import { collection, query, where, orderBy, getDocs, deleteDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore'; 
+import { db } from '../firebase';
+
+
+// Helper function to safely format dates from Firestore Timestamp
+const formatDate = (timestamp) => {
+  if (!timestamp) return "N/A";
+  
+  try {
+    // Handle Firestore Timestamp objects
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toLocaleString();
+    } else if (timestamp.seconds || timestamp._seconds) {
+        const seconds = timestamp.seconds || timestamp._seconds;
+        return new Date(seconds * 1000).toLocaleString();
+    } else {
+        const d = new Date(timestamp);
+        return isNaN(d.getTime()) ? "N/A" : d.toLocaleString();
+    }
+  } catch (err) {
+    console.error("Error formatting date:", err);
+    return "N/A";
+  }
+};
+
+
+// 🚨 REMOVED: CATEGORIES constant (was Line 45)
+// 🚨 REMOVED: DIFFICULTIES constant (was Line 136)
+
 
 const ResumeAnalysisPage = () => {
   const [jdText, setJdText] = useState("");
   const [file, setFile] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState([]); // HISTORY STATE MOVED HERE
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -39,6 +70,50 @@ const ResumeAnalysisPage = () => {
   // Get actual userId from Firebase auth
   const userId = user?.uid || null;
 
+  // Helper to clamp percent values to 0-100 (kept local)
+  const clamp = (val) => {
+    const n = Number(val) || 0;
+    return Math.min(100, Math.max(0, Math.round(n)));
+  };
+
+  // --- HISTORY FETCHING LOGIC ---
+  const fetchHistory = useCallback(async () => {
+    if (!userId) return;
+    
+    setIsHistoryLoading(true);
+    try {
+        const resumeSessionsRef = collection(db, 'resume_analysis');
+        const q = query(
+            resumeSessionsRef,
+            where('userId', '==', userId),
+            orderBy('timestamp', 'desc')
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const fetchedData = [];
+        
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            fetchedData.push({
+                docId: doc.id,
+                score: data.score,
+                similarity_with_jd: data.similarity_with_jd,
+                ats_score: data.ats_score,
+                timestamp: data.timestamp,
+                job_description_preview: data.job_description_preview || '',
+            });
+        });
+        
+        setHistory(fetchedData);
+    } catch (err) {
+        console.error('❌ Failed to fetch resume history from Firestore:', err);
+    } finally {
+        setIsHistoryLoading(false);
+    }
+  }, [userId]);
+  // --- END HISTORY FETCHING LOGIC ---
+
+
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -51,24 +126,43 @@ const ResumeAnalysisPage = () => {
     return () => unsubscribe();
   }, [auth, navigate]);
 
-  const fetchHistory = useCallback(async () => {
-    if (!userId) return;
-    
-    setIsHistoryLoading(true);
-    try {
-      const response = await api.get(`/api/resume/history?userId=${userId}`);
-      setHistory(response.data);
-    } catch (err) {
-      console.error("Failed to fetch resume history", err);
-      setHistory([]);
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [userId]);
-
+  // Fetch history when user changes or component mounts
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+  
+  // --- DELETE LOGIC ---
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      const docIdToDelete = itemToDelete.docId;
+
+      if (!docIdToDelete) {
+          alert('Cannot delete: No document ID available.');
+          setShowDeleteModal(false);
+          setItemToDelete(null);
+          return;
+      }
+      
+      const docRef = doc(db, 'resume_analysis', docIdToDelete);
+      await deleteDoc(docRef);
+      
+      // Optimistically update local state
+      setHistory((prevHistory) => prevHistory.filter((it) => 
+          it.docId !== docIdToDelete
+      ));
+      
+    } catch (err) {
+      console.error("Failed to delete history entry:", err);
+      alert("Failed to delete history entry.");
+    } finally {
+      setShowDeleteModal(false);
+      setItemToDelete(null);
+    }
+  };
+  // --- END DELETE LOGIC ---
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,15 +178,33 @@ const ResumeAnalysisPage = () => {
     formData.append("userId", userId);
 
     try {
+      // 1. Call the backend proxy for analysis
       const res = await api.post("/api/resume", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setAnalysisResult(res.data);
-      fetchHistory(); // Refresh history after new analysis
+      const result = res.data;
+      setAnalysisResult(result);
+      
+      // 2. Save the result to Firestore
+      if (result && result.text_preview) { 
+          const resumeSessionsRef = collection(db, 'resume_analysis');
+          await addDoc(resumeSessionsRef, {
+              userId: userId,
+              timestamp: serverTimestamp(),
+              score: result.score,
+              similarity_with_jd: result.similarity_with_jd,
+              ats_score: result.ats_score,
+              job_description_preview: jdText.substring(0, 100) + '...',
+          });
+      }
+      
+      // 3. Refresh history from Firestore
+      fetchHistory(); 
+
     } catch (err) {
       console.error("Error analyzing resume:", err);
-      setAnalysisResult({ error: err.message || "Resume analysis failed." });
+      setAnalysisResult({ error: err.response?.data?.error || err.message || "Resume analysis failed." });
     }
     setLoading(false);
   };
@@ -102,26 +214,6 @@ const ResumeAnalysisPage = () => {
     setShowDeleteModal(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!itemToDelete) return;
-
-    try {
-      const payload = { userId, docId: itemToDelete.docId };
-      await api.post("/api/resume/history/delete", payload);
-
-      // Optimistically remove the item from local state
-      setHistory((prevHistory) =>
-        prevHistory.filter((item) => item.docId !== itemToDelete.docId)
-      );
-      alert("History entry deleted successfully.");
-    } catch (err) {
-      console.error("Failed to delete history entry:", err);
-      alert("Failed to delete history entry.");
-    } finally {
-      setShowDeleteModal(false);
-      setItemToDelete(null);
-    }
-  };
 
   const getSuggestions = () => {
     if (!analysisResult) return [];
@@ -141,57 +233,62 @@ const ResumeAnalysisPage = () => {
     return suggestions;
   };
 
-  // helper to clamp percent values to 0-100
-  const clamp = (val) => {
-    const n = Number(val) || 0;
-    return Math.min(100, Math.max(0, Math.round(n)));
-  };
 
-  // Memoized filtered and sorted history
+  // Memoized filtered and sorted history 
   const processedHistory = useMemo(() => {
     let filtered = history;
-    // Filter by searchTerm (score, date)
+    
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((item) => {
-        const scoreStr = String(item.score ?? "");
-        const dateStr = item.timestamp?._seconds ? new Date(item.timestamp._seconds * 1000).toLocaleString().toLowerCase() : "";
-        return scoreStr.includes(term) || dateStr.includes(term);
-      });
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter((item) => {
+            const scoreStr = String(item.score ?? "");
+            // Handle different timestamp access for searching
+            const dateVal = item.timestamp?.toDate ? item.timestamp.toDate() : (item.timestamp?._seconds ? new Date(item.timestamp._seconds * 1000) : null);
+            const dateStr = dateVal ? dateVal.toLocaleString().toLowerCase() : "";
+            const similarityStr = String(item.similarity_with_jd ?? "");
+            const atsStr = String(item.ats_score ?? "");
+            return scoreStr.includes(term) || dateStr.includes(term) || similarityStr.includes(term) || atsStr.includes(term);
+        });
     }
-    // Sort
+
     filtered = [...filtered].sort((a, b) => {
-      let aVal = a[sortKey];
-      let bVal = b[sortKey];
-      if (sortKey === "timestamp") {
-        aVal = a.timestamp?._seconds || 0;
-        bVal = b.timestamp?._seconds || 0;
-      }
-      if (sortDirection === "asc") {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
+        let aVal = a[sortKey];
+        let bVal = b[sortKey];
+        
+        if (sortKey === "timestamp") {
+            // Handle Firestore timestamp objects for sorting (sort by seconds value)
+            aVal = a.timestamp?.seconds || a.timestamp?._seconds || 0;
+            bVal = b.timestamp?.seconds || b.timestamp?._seconds || 0;
+        }
+        // Ensure numeric fields are treated as numbers
+        if (['score', 'ats_score', 'similarity_with_jd'].includes(sortKey)) {
+            aVal = Number(aVal) || 0;
+            bVal = Number(bVal) || 0;
+        }
+        
+        if (sortDirection === "asc") {
+            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        } else {
+            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        }
     });
+    
     // Latest only
     if (showLatestOnly && filtered.length) {
-      return [filtered[0]];
+        return [filtered[0]];
     }
+
     return filtered;
   }, [history, searchTerm, sortKey, sortDirection, showLatestOnly]);
 
-  // Export to CSV
+
+  // Export to CSV (using history data from the hook)
   const handleExport = () => {
     if (!processedHistory.length) return;
     const headers = ["Date", "Score", "Similarity", "ATS Score"];
     const rows = processedHistory.map((h) => {
-      let dateStr = "";
-      if (h.timestamp?._seconds) {
-        dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
-      } else if (h.timestamp) {
-        const d = new Date(h.timestamp);
-        dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
-      }
+      const dateStr = formatDate(h.timestamp);
+
       return [
         dateStr,
         clamp(h.score),
@@ -432,20 +529,20 @@ const ResumeAnalysisPage = () => {
                 </tr>
               ) : processedHistory.length ? (
                 processedHistory.map((h, idx) => {
-                  let dateStr = "";
-                  if (h.timestamp?._seconds) {
-                    dateStr = new Date(h.timestamp._seconds * 1000).toLocaleString();
-                  } else if (h.timestamp) {
-                    // Try parsing as string or ISO date
-                    const d = new Date(h.timestamp);
-                    dateStr = isNaN(d.getTime()) ? "" : d.toLocaleString();
-                  }
+                  const dateStr = formatDate(h.timestamp);
+
                   return (
                     <tr key={h.docId}>
                       <td>{dateStr}</td>
-                      <td>{clamp(h.score)}/100</td>
-                      <td>{clamp(h.similarity_with_jd)}%</td>
-                      <td>{clamp(h.ats_score)}%</td>
+                      <td>
+                        <Badge bg="primary">{clamp(h.score)}/100</Badge>
+                      </td>
+                      <td>
+                        <Badge bg="success">{clamp(h.similarity_with_jd)}%</Badge>
+                      </td>
+                      <td>
+                        <Badge bg="warning">{clamp(h.ats_score)}%</Badge>
+                      </td>
                       <td>
                         <Button
                           variant="danger"
