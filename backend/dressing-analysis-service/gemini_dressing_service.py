@@ -235,12 +235,12 @@ def health():
     }), 200
 
 # --------------------- Main ---------------------
-if __name__ == '__main__':
-    logger.info("=" * 60)
-    logger.info("Starting Dressing Analysis Service (Gemini Vision API)")
-    logger.info("=" * 60)
-    logger.info(f"Port: {PORT}")
-    logger.info(f"Gemini API: {'✅ Configured' if GEMINI_API_KEY else '❌ Not Configured'}")
-    logger.info("=" * 60)
+# if __name__ == '__main__':
+#     logger.info("=" * 60)
+#     logger.info("Starting Dressing Analysis Service (Gemini Vision API)")
+#     logger.info("=" * 60)
+#     logger.info(f"Port: {PORT}")
+#     logger.info(f"Gemini API: {'✅ Configured' if GEMINI_API_KEY else '❌ Not Configured'}")
+#     logger.info("=" * 60)
     
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+#     app.run(host='0.0.0.0', port=PORT, debug=False)

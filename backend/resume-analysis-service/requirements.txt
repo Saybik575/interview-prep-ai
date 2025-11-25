@@ -5,3 +5,4 @@ werkzeug>=3.0.0
 docx2txt>=0.8
 pdfminer.six>=20231228
 google-cloud-firestore>=2.14.0
+gunicorn==23.0.0

@@ -169,6 +169,6 @@ def analyze_posture_yolo():
         app.logger.error("Internal error during analysis: %s\n%s", e, traceback.format_exc())
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    app.logger.info("Starting YOLO Posture Service...")
-    app.run(host='0.0.0.0', port=5001)
+# if __name__ == '__main__':
+#     app.logger.info("Starting YOLO Posture Service...")
+#     app.run(host='0.0.0.0', port=5001)

@@ -430,19 +430,19 @@ def run_test_image(path):
 
 
 # --------------------- Entrypoint ---------------------
-if __name__ == "__main__":
-    import argparse
+# if __name__ == "__main__":
+#     import argparse
 
-    parser = argparse.ArgumentParser(description="Run YOLO Dressing Analysis Service")
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=PORT)
-    parser.add_argument("--test-image", help="Path to a test image (runs once and exits)")
-    args = parser.parse_args()
+#     parser = argparse.ArgumentParser(description="Run YOLO Dressing Analysis Service")
+#     parser.add_argument("--host", default="0.0.0.0")
+#     parser.add_argument("--port", type=int, default=PORT)
+#     parser.add_argument("--test-image", help="Path to a test image (runs once and exits)")
+#     args = parser.parse_args()
 
-    if args.test_image:
-        run_test_image(args.test_image)
-    else:
-        logger.info(f"Starting Flask server on port {args.port} (model_path={MODEL_PATH})")
-        # Ensure model is loaded before running app
-        get_model() 
-        app.run(host=args.host, port=args.port, debug=False)
+#     if args.test_image:
+#         run_test_image(args.test_image)
+#     else:
+#         logger.info(f"Starting Flask server on port {args.port} (model_path={MODEL_PATH})")
+#         # Ensure model is loaded before running app
+#         get_model() 
+#         app.run(host=args.host, port=args.port, debug=False)
