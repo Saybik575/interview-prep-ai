@@ -1,5 +1,3 @@
-// server.js - FULL CORRECTED CODE (Removed GET /api/interview/history)
-
 const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
@@ -82,7 +80,7 @@ try {
 if (!admin.apps.length) {
   console.error('🚨 Firebase Admin not initialized: no apps registered. Check environment variables and private key formatting.');
 } else if (!db) {
-  console.error('🚨 Firestore (db) reference not established even though Firebase initialized.');
+  console.error('🚨 Firestore (db) reference not established even though Firebase initialized.' );
 } else {
   console.log('🔍 Firebase verification: admin app count =', admin.apps.length);
 }
@@ -867,7 +865,6 @@ app.delete('/api/posture/history/:docId', async (req, res) => {
     return res.status(500).json({ error: 'Failed to delete posture session', message: err.message, docId });
   }
 });
-
 
 
 // 404 handler (must come before error middleware and AFTER all valid routes)
