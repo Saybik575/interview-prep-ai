@@ -244,20 +244,6 @@ interview-prep-ai/
 
 -----
 
-## 📝 TODO (Future Enhancements)
-
-  * [ ] Implement **full AI resume parsing** (e.g., extraction of skills, experience, and targeted suggestions).
-  * [ ] Add **posture detection** using computer vision and real-time libraries (e.g., TensorFlow.js or OpenCV integration).
-  * [ ] Add **AI-driven question generation** that adapts to the user's resume and interview performance.
-  * [ ] Implement **user analytics and progress system** to track improvement over time.
-  * [ ] Implement **recording for mock interviews** for later review.
-  * [ ] Add multi-language support.
-  * [ ] Create an **admin dashboard** for content management and user oversight.
-  * [ ] Add unit and integration testing.
-  * [ ] Integrate **CI/CD pipeline** for automated deployments.
-
------
-
 ## ⚠️ Troubleshooting
 
 ### Frontend Issues
