@@ -1,9 +1,12 @@
-Answering the request by generating a comprehensive GitHub README based on the provided project specification.
-
-````markdown
 # 🤖 AI-Powered Interview Preparation App
 
 A comprehensive interview preparation platform that leverages artificial intelligence to help users dramatically improve their interview skills through **resume analysis**, **posture training**, **dressing sense guidance**, and **AI-driven mock interviews**.
+
+## Demo
+
+### Video Demonstration
+You can watch the full project demo here:  
+[![Watch the video]([https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID](https://drive.google.com/file/d/1dHcEr6sRnsCOlr10X2fsYgE9TP_MM1ov/view?usp=drive_link))
 
 ## ✨ Features
 
@@ -269,10 +272,6 @@ interview-prep-ai/
 
 -----
 
-## 📜 License
-
-This project is licensed under the **ISC License**.
-
 ## 🤝 Contributing
 
 1.  Fork the repository.
@@ -292,7 +291,7 @@ This project is licensed under the **ISC License**.
 
 **Author**
 
-Your Name – Final Year B.Tech Project
+Satvik Kumar – Final Year B.Tech Project
 
 ```
 ```
