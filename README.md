@@ -5,8 +5,10 @@ A comprehensive interview preparation platform that leverages artificial intelli
 ## Demo
 
 ### Video Demonstration
-You can watch the full project demo here:  
-[![Watch the video](https://youtu.be/VIDEO_ID](https://drive.google.com/file/d/1dHcEr6sRnsCOlr10X2fsYgE9TP_MM1ov/view?usp=drive_link))
+
+[![Watch the demo video](https://img.shields.io/badge/Watch%20Video-Demo-blue)](https://drive.google.com/file/d/1dHcEr6sRnsCOlr10X2fsYgE9TP_MM1ov/view?usp=drive_link)
+
+*(Video hosted on Google Drive — face blurred for privacy.)*
 
 ## ✨ Features
 
