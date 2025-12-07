@@ -2,6 +2,20 @@
 
 A comprehensive interview preparation platform that leverages artificial intelligence to help users dramatically improve their interview skills through **resume analysis**, **posture training**, **dressing sense guidance**, and **AI-driven mock interviews**.
 
+## Table of Contents
+- [Demo](#demo)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Quick Start](#-quick-start)
+- [Firebase Setup](#️-firebase-setup)
+- [Project Structure](#-project-structure)
+- [Routes](#-available-routes)
+- [Customization](#-customization)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [Acknowledgments](#-acknowledgments)
+
 ## Demo
 
 ### Video Demonstration
@@ -270,16 +284,21 @@ interview-prep-ai/
 
 ## 🙏 Acknowledgments
 
-  * [React](https://reactjs.org/)
-  * [Tailwind CSS](https://tailwindcss.com/)
-  * [Firebase](https://firebase.google.com/)
-  * [Express.js](https://expressjs.com/)
+This project would not have been possible without the following technologies:
+
+### Frontend
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)
+
+### Backend
+[![Node.js](https://img.shields.io/badge/Node.js-3C873A?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+
+### Cloud Services
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 
 -----
 
 **Author**
 
 Satvik Kumar – Final Year B.Tech Project
-
-```
-```
