@@ -49,10 +49,11 @@ A comprehensive interview preparation platform that leverages artificial intelli
 | :--- | :--- | :--- |
 | **Frontend** | React 18, React Router | Modern UI development using Functional Components and Hooks. |
 | **Styling** | Tailwind CSS, PostCSS, Autoprefixer | Utility-first CSS framework for rapid and consistent styling. |
-| **Authentication/DB** | Firebase (Auth, Firestore, Storage) | Client-side integration for secure auth and cloud database access. |
-| **Backend** | Node.js, Express.js | Fast, unopinionated web framework for the RESTful API. |
-| **Admin/Service** | Firebase Admin SDK | Secure server-side access to Firebase services. |
-| **Dev Tools** | Nodemon, dotenv | For efficient development and environment variable management. |
+| **Authentication/DB** | Firebase (Auth, Firestore, Storage) | Client-side integration for secure authentication and cloud database/storage. |
+| **Backend (API)** | Node.js, Express.js | RESTful API handling requests, authentication flows, and business logic. |
+| **Backend (ML Services)** | Python, Flask | Handles machine learning inference for resume analysis, posture detection, and related AI models. |
+| **Admin/Service** | Firebase Admin SDK | Secure server-side access for Firestore, Authentication, and Storage operations. |
+| **Dev Tools** | Nodemon, dotenv | Used for rapid development and environment variable management. |
 
 ---
 
@@ -284,15 +285,16 @@ interview-prep-ai/
 
 ## 🙏 Acknowledgments
 
-This project would not have been possible without the following technologies:
+This project is made possible using the following technologies:
 
 ### Frontend
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)
 
-### Backend
-[![Node.js](https://img.shields.io/badge/Node.js-3C873A?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+### Backend & API
 [![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 
 ### Cloud Services
 [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
