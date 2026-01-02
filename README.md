@@ -303,4 +303,4 @@ This project is made possible using the following technologies:
 
 **Author**
 
-Satvik Kumar – Final Year B.Tech Project
+Satvik Kumar – IPD Project
